@@ -51,6 +51,7 @@ PRIVATE_KEY_PATH=/home/doobee/doobee/private-key.pem
 WEBHOOK_SECRET=
 REPOS_DIR=/home/doobee/repos
 PORT=3000
+BOT_NAME=doobeebot[bot]
 ENVEOF
   chown "$DOOBEE_USER:$DOOBEE_USER" "$DOOBEE_DIR/.env"
   chmod 600 "$DOOBEE_DIR/.env"
