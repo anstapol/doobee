@@ -1,0 +1,27 @@
+{
+  "name": "doobee",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/server.ts",
+    "check": "tsc --noEmit",
+    "lint": "biome check src/",
+    "format": "biome check --write src/",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,json}": "biome check --write --no-errors-on-unmatched"
+  },
+  "dependencies": {
+    "@octokit/app": "^15.1.2",
+    "@octokit/webhooks": "^13.4.2"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.0",
+    "@types/bun": "^1.2.4",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "typescript": "^5.7.3"
+  }
+}

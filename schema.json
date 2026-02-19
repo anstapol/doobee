@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/anstapol/doobee/doobee.schema.json",
+  "title": "Doobee Configuration",
+  "description": "Configuration for the Doobee automated issue resolver",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Path or URL to the JSON Schema for editor validation"
+    },
+    "baseBranch": {
+      "type": "string",
+      "default": "main",
+      "description": "Base branch to create feature branches from"
+    },
+    "commands": {
+      "type": "object",
+      "description": "Lifecycle commands run at various stages of a solve session",
+      "properties": {
+        "setup": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Run once before processing issues (e.g. [\"npm ci\"])"
+        },
+        "start": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Run before each session (e.g. [\"docker compose up -d\"])"
+        },
+        "stop": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Run after each session (e.g. [\"docker compose down\"])"
+        },
+        "verify": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Verify the build (e.g. [\"turbo typecheck lint build\"])"
+        },
+        "fix": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Auto-fix lint/format issues (e.g. [\"turbo lint:fix format:fix\"])"
+        }
+      },
+      "additionalProperties": false
+    },
+    "maxRetries": {
+      "type": "integer",
+      "default": 3,
+      "minimum": 1,
+      "description": "Maximum retry attempts before marking an issue as stuck"
+    },
+    "promptContext": {
+      "type": "string",
+      "description": "Additional context injected into the Claude prompt (e.g. repo structure, conventions)"
+    },
+    "model": {
+      "type": "string",
+      "description": "Claude model to use (e.g. claude-sonnet-4-5-20250929, claude-opus-4-6)"
+    }
+  },
+  "additionalProperties": false
+}

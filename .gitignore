@@ -1,0 +1,16 @@
+# IDE / editor
+.history/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Dependencies
+node_modules/
+
+# OS
+.DS_Store
+
+# Logs
+*.log
