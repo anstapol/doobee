@@ -12,14 +12,14 @@ Restart=on-failure
 RestartSec=5
 
 # Bun auto-loads .env from WorkingDirectory
-# Environment overrides (if needed):
-# Environment=PORT=3000
+# claude CLI lives in ~/.bun/bin — must be on PATH for Bun.spawn
+Environment=PATH=/home/doobee/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # Security hardening
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/doobee/repos /home/doobee/.claude /home/doobee/doobee/repos
+ReadWritePaths=/home/doobee/repos /home/doobee/.claude /home/doobee/.bun /home/doobee/doobee/repos
 PrivateTmp=true
 
 [Install]
