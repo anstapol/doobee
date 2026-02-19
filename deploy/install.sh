@@ -2,17 +2,17 @@
 set -euo pipefail
 
 # Doobee install script for Ubuntu VPS
-# Run as root: sudo bash install.sh
+# Usage: clone/copy the repo to the VPS, then run:
+#   sudo bash deploy/install.sh
 
 DOOBEE_USER="doobee"
 DOOBEE_HOME="/home/$DOOBEE_USER"
 DOOBEE_DIR="$DOOBEE_HOME/doobee"
 REPOS_DIR="$DOOBEE_HOME/repos"
-REPO_URL="https://github.com/anstapol/doobee.git"
-BRANCH="main"
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 if [ "$(id -u)" -ne 0 ]; then
-  echo "Run as root: sudo bash install.sh"
+  echo "Run as root: sudo bash deploy/install.sh"
   exit 1
 fi
 
@@ -31,13 +31,20 @@ echo "==> Installing Bun"
 sudo -u "$DOOBEE_USER" bash -c 'curl -fsSL https://bun.sh/install | bash'
 
 echo "==> Installing Claude Code CLI"
-sudo -u "$DOOBEE_USER" bash -c 'export PATH="$HOME/.bun/bin:$PATH" && bun install -g @anthropic-ai/claude-code'
-
-echo "==> Cloning Doobee"
-if [ -d "$DOOBEE_DIR" ]; then
-  sudo -u "$DOOBEE_USER" git -C "$DOOBEE_DIR" pull
+if sudo -u "$DOOBEE_USER" bash -c 'export PATH="$HOME/.bun/bin:$PATH" && command -v claude' &>/dev/null; then
+  echo "    Already installed, upgrading"
+  sudo -u "$DOOBEE_USER" bash -c 'export PATH="$HOME/.bun/bin:$PATH" && bun update -g @anthropic-ai/claude-code'
 else
-  sudo -u "$DOOBEE_USER" git clone -b "$BRANCH" "$REPO_URL" "$DOOBEE_DIR"
+  sudo -u "$DOOBEE_USER" bash -c 'export PATH="$HOME/.bun/bin:$PATH" && bun install -g @anthropic-ai/claude-code'
+fi
+
+echo "==> Copying source to $DOOBEE_DIR"
+if [ "$SCRIPT_DIR" != "$DOOBEE_DIR" ]; then
+  mkdir -p "$DOOBEE_DIR"
+  cp -a "$SCRIPT_DIR/." "$DOOBEE_DIR/"
+  chown -R "$DOOBEE_USER:$DOOBEE_USER" "$DOOBEE_DIR"
+else
+  echo "    Already at $DOOBEE_DIR, skipping"
 fi
 
 echo "==> Installing dependencies"

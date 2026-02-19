@@ -220,12 +220,43 @@ This is the only label Doobee uses. Created automatically when the app is instal
 
 ## Deployment
 
-Run as a persistent process on any server with Bun, git, and Claude CLI installed.
+### VPS setup
 
-> **Note:** Claude CLI refuses `--dangerously-skip-permissions` as root — use a non-root user.
+Copy the repo to your server and run the install script:
+
+```bash
+# From your local machine
+scp -r ./doobee root@your-vps:/tmp/doobee
+
+# On the VPS (as root)
+bash /tmp/doobee/deploy/install.sh
+```
+
+The script creates a `doobee` user, installs Bun, Claude Code CLI, copies the source to `/home/doobee/doobee`, installs dependencies, and sets up a systemd service.
+
+After install, follow the printed instructions to:
+
+1. Copy your GitHub App private key (`.pem`)
+2. Fill in `.env` (`APP_ID`, `WEBHOOK_SECRET`)
+3. Authenticate Claude CLI (`claude login`)
+4. Set up a reverse proxy (Caddy recommended for auto-HTTPS)
+5. Start the service (`systemctl start doobee`)
+
+To deploy updates:
+
+```bash
+# Copy new code and restart
+scp -r ./doobee root@your-vps:/tmp/doobee
+# On VPS:
+bash /tmp/doobee/deploy/deploy.sh
+```
+
+> **Note:** Claude CLI refuses `--dangerously-skip-permissions` as root — the install script creates a dedicated `doobee` user for this reason.
+
+### Local development
 
 ```bash
 bun run dev
 ```
 
-Use a process manager (systemd, pm2, etc.) for production. Ensure the webhook URL is publicly accessible (or use a tunnel like ngrok for development).
+Use ngrok or a similar tunnel to expose the webhook URL during development.
