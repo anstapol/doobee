@@ -43,7 +43,8 @@ export async function handleReviewRequested(
 
   console.log(`[review-requested] Review requested on PR #${pr.number} in ${owner}/${repo}`)
 
-  await cloneIfMissing(repoUrl, repoDir)
+  const token = await github.token(installationId)
+  await cloneIfMissing(repoUrl, repoDir, token)
   const config = await loadConfig(repoDir)
 
   queue.enqueue({

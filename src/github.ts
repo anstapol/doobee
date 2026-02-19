@@ -5,6 +5,7 @@ import type { InlineComment, Issue, PullRequest, Result, ReviewComment } from ".
 export interface GitHub {
   app: App
   api(installationId: number): Promise<Octokit>
+  token(installationId: number): Promise<string>
 }
 
 export function createGitHub(appId: string, privateKey: string, webhookSecret: string): GitHub {
@@ -17,6 +18,13 @@ export function createGitHub(appId: string, privateKey: string, webhookSecret: s
   return {
     app,
     api: (installationId: number) => app.getInstallationOctokit(installationId),
+    token: async (installationId: number) => {
+      const auth = (await app.octokit.auth({
+        type: "installation",
+        installationId,
+      })) as { token: string }
+      return auth.token
+    },
   }
 }
 
