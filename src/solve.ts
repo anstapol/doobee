@@ -1,7 +1,15 @@
 import type { Octokit } from "@octokit/core"
 import { buildSolvePrompt, buildSystemPrompt, runClaude } from "./claude"
 import { runCommands } from "./commands"
-import { createWorktree, fetch, getCurrentSha, hasNewCommits, push, removeWorktree } from "./git"
+import {
+  configureAuth,
+  createWorktree,
+  fetch,
+  getCurrentSha,
+  hasNewCommits,
+  push,
+  removeWorktree,
+} from "./git"
 import type { GitHub } from "./github"
 import {
   addLabel,
@@ -52,7 +60,9 @@ export async function solve(ctx: SolveContext): Promise<void> {
   const octokit = await github.api(installationId)
   const botLogin = process.env.BOT_NAME ?? "doobeebot[bot]"
 
-  // 1. Fetch origin
+  // 1. Configure auth and fetch origin
+  const token = await github.token(installationId)
+  await configureAuth(repoDir, token)
   const fetchResult = await fetch(repoDir)
   if (!fetchResult.ok) {
     console.error(`[solve] Fetch failed: ${fetchResult.error}`)
@@ -152,6 +162,9 @@ export async function solve(ctx: SolveContext): Promise<void> {
 
     // 6. Push and create PR if there are commits
     if (solved.length > 0) {
+      // Refresh token — Claude session may have taken a while
+      const pushToken = await github.token(installationId)
+      await configureAuth(repoDir, pushToken)
       const pushResult = await push(wtPath, group.branch)
       if (pushResult.ok) {
         const closes = solved.map((i) => `Closes #${i.number}`).join("\n")

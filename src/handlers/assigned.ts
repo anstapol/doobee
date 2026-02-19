@@ -39,7 +39,8 @@ export async function handleAssigned(
 
   console.log(`[assigned] Issue #${issue.number} assigned to ${assignee} in ${owner}/${repo}`)
 
-  await cloneIfMissing(repoUrl, repoDir)
+  const token = await github.token(installationId)
+  await cloneIfMissing(repoUrl, repoDir, token)
   const config = await loadConfig(repoDir)
 
   queue.enqueue({

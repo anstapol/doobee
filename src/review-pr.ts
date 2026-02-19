@@ -4,7 +4,7 @@ import {
   parseReviewComments,
   runClaude,
 } from "./claude"
-import { createWorktree, fetch, getDiff, removeWorktree } from "./git"
+import { configureAuth, createWorktree, fetch, getDiff, removeWorktree } from "./git"
 import type { GitHub } from "./github"
 import { postComment, submitReview } from "./github"
 import type { DoobeeConfig, PullRequest } from "./types"
@@ -22,7 +22,9 @@ export async function reviewPr(ctx: ReviewPrContext): Promise<void> {
   const { pr, baseBranch, installationId, github, config, repoDir } = ctx
   const octokit = await github.api(installationId)
 
-  // 1. Fetch origin
+  // 1. Configure auth and fetch origin
+  const token = await github.token(installationId)
+  await configureAuth(repoDir, token)
   const fetchResult = await fetch(repoDir)
   if (!fetchResult.ok) {
     console.error(`[review-pr] Fetch failed: ${fetchResult.error}`)

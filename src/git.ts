@@ -16,6 +16,22 @@ async function run(cmd: string[], cwd: string): Promise<Result<string>> {
   return { ok: true, value: stdout.trim() }
 }
 
+function authedUrl(cloneUrl: string, token: string): string {
+  const url = new URL(cloneUrl)
+  url.username = "x-access-token"
+  url.password = token
+  return url.toString()
+}
+
+export async function configureAuth(repoDir: string, token: string): Promise<void> {
+  const result = await run(["git", "remote", "get-url", "origin"], repoDir)
+  if (!result.ok) return
+  const url = new URL(result.value)
+  url.username = "x-access-token"
+  url.password = token
+  await run(["git", "remote", "set-url", "origin", url.toString()], repoDir)
+}
+
 function sanitizeBranch(branch: string): string {
   return branch.replace(/[^a-zA-Z0-9\-_/]/g, "-")
 }
@@ -102,8 +118,13 @@ export async function readFileFromRef(
   return run(["git", "show", `${ref}:${filePath}`], repoDir)
 }
 
-export async function cloneIfMissing(repoUrl: string, repoDir: string): Promise<void> {
+export async function cloneIfMissing(
+  repoUrl: string,
+  repoDir: string,
+  token?: string,
+): Promise<void> {
   if (existsSync(repoDir)) {
+    if (token) await configureAuth(repoDir, token)
     await fetch(repoDir)
     return
   }
@@ -111,7 +132,8 @@ export async function cloneIfMissing(repoUrl: string, repoDir: string): Promise<
   const parent = join(repoDir, "..")
   mkdirSync(parent, { recursive: true })
 
-  const result = await run(["git", "clone", repoUrl, repoDir], parent)
+  const url = token ? authedUrl(repoUrl, token) : repoUrl
+  const result = await run(["git", "clone", url, repoDir], parent)
   if (!result.ok) {
     throw new Error(`Failed to clone ${repoUrl}: ${result.error}`)
   }
