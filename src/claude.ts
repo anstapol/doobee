@@ -50,7 +50,11 @@ export async function runClaude(opts: {
   return { status: "solved", output }
 }
 
-export function buildSolvePrompt(issue: Issue, config: DoobeeConfig): string {
+export function buildSolvePrompt(
+  issue: Issue,
+  config: DoobeeConfig,
+  extraContext?: string,
+): string {
   const lines: string[] = [`# Issue #${issue.number}: ${issue.title}`, ""]
 
   if (issue.body) {
@@ -59,6 +63,10 @@ export function buildSolvePrompt(issue: Issue, config: DoobeeConfig): string {
 
   if (config.promptContext) {
     lines.push("## Additional Context", "", config.promptContext, "")
+  }
+
+  if (extraContext) {
+    lines.push("## User Instructions", "", extraContext, "")
   }
 
   lines.push(
@@ -138,7 +146,12 @@ export function buildRevisionPrompt(
   return lines.join("\n")
 }
 
-export function buildReviewPrompt(pr: PullRequest, diff: string, config: DoobeeConfig): string {
+export function buildReviewPrompt(
+  pr: PullRequest,
+  diff: string,
+  config: DoobeeConfig,
+  extraContext?: string,
+): string {
   const lines: string[] = [`# PR #${pr.number}: ${pr.title}`, ""]
 
   if (pr.body) {
@@ -149,6 +162,10 @@ export function buildReviewPrompt(pr: PullRequest, diff: string, config: DoobeeC
 
   if (config.promptContext) {
     lines.push("## Additional Context", "", config.promptContext, "")
+  }
+
+  if (extraContext) {
+    lines.push("## User Instructions", "", extraContext, "")
   }
 
   lines.push(

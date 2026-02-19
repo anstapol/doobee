@@ -105,11 +105,6 @@ export async function getDiff(worktreePath: string, base: string): Promise<Resul
   return run(["git", "diff", `origin/${base}...HEAD`], worktreePath)
 }
 
-export async function deleteBranch(repoDir: string, branch: string): Promise<void> {
-  await run(["git", "branch", "-D", branch], repoDir)
-  await run(["git", "push", "origin", "--delete", branch], repoDir)
-}
-
 export async function readFileFromRef(
   repoDir: string,
   ref: string,

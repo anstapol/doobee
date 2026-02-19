@@ -97,18 +97,6 @@ export async function postComment(
   })
 }
 
-export async function assignIssue(
-  octokit: Octokit,
-  opts: { owner: string; repo: string; issueNumber: number; assignees: string[] },
-): Promise<void> {
-  await octokit.request("POST /repos/{owner}/{repo}/issues/{issue_number}/assignees", {
-    owner: opts.owner,
-    repo: opts.repo,
-    issue_number: opts.issueNumber,
-    assignees: opts.assignees,
-  })
-}
-
 export async function unassignIssue(
   octokit: Octokit,
   opts: { owner: string; repo: string; issueNumber: number; assignees: string[] },
@@ -256,6 +244,35 @@ export async function fetchParent(
     }
   } catch {
     return null
+  }
+}
+
+export async function fetchPr(
+  octokit: Octokit,
+  opts: { owner: string; repo: string; prNumber: number },
+): Promise<Result<{ pr: PullRequest; baseBranch: string }>> {
+  try {
+    const { data } = await octokit.request("GET /repos/{owner}/{repo}/pulls/{pull_number}", {
+      owner: opts.owner,
+      repo: opts.repo,
+      pull_number: opts.prNumber,
+    })
+    return {
+      ok: true,
+      value: {
+        pr: {
+          number: data.number,
+          title: data.title,
+          body: data.body ?? "",
+          branch: data.head.ref,
+          repoOwner: opts.owner,
+          repoName: opts.repo,
+        },
+        baseBranch: data.base.ref,
+      },
+    }
+  } catch (err) {
+    return { ok: false, error: `Failed to fetch PR: ${err}` }
   }
 }
 
