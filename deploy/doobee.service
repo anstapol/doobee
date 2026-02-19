@@ -1,0 +1,26 @@
+[Unit]
+Description=Doobee GitHub App
+After=network.target
+
+[Service]
+Type=simple
+User=doobee
+Group=doobee
+WorkingDirectory=/home/doobee/doobee
+ExecStart=/home/doobee/.bun/bin/bun run dev
+Restart=on-failure
+RestartSec=5
+
+# Bun auto-loads .env from WorkingDirectory
+# Environment overrides (if needed):
+# Environment=PORT=3000
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/doobee/repos /home/doobee/.claude /home/doobee/doobee/repos
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
