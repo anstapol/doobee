@@ -225,8 +225,8 @@ This is the only label Doobee uses. Created automatically when the app is instal
 Copy the repo to your server and run the install script:
 
 ```bash
-# From your local machine
-scp -r ./doobee root@your-vps:/tmp/doobee
+# From your local machine (only tracked files, respects .gitignore)
+git archive --format=tar HEAD | ssh root@your-vps 'mkdir -p /tmp/doobee && tar -xf - -C /tmp/doobee'
 
 # On the VPS (as root)
 bash /tmp/doobee/deploy/install.sh
@@ -245,9 +245,10 @@ After install, follow the printed instructions to:
 To deploy updates:
 
 ```bash
-# Copy new code and restart
-scp -r ./doobee root@your-vps:/tmp/doobee
-# On VPS:
+# From your local machine
+git archive --format=tar HEAD | ssh root@your-vps 'mkdir -p /tmp/doobee && tar -xf - -C /tmp/doobee'
+
+# On VPS
 bash /tmp/doobee/deploy/deploy.sh
 ```
 
