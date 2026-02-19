@@ -8,14 +8,14 @@ GitHub App that resolves issues autonomously. Listens for webhooks, spawns Claud
 GitHub webhook → Bun HTTP server → Job queue → Claude Code CLI
 ```
 
-Event-driven. No polling, no cron. A user assigns an issue to `doobeebot[bot]`, the webhook fires, Claude solves it, a PR appears.
+Event-driven. No polling, no cron. A user assigns an issue to `doobeebot[bot]` or adds the `doobee:solve` label, the webhook fires, Claude solves it, a PR appears.
 
 ### Data flow
 
 **Solve** (issue → PR):
 ```
-issues.assigned webhook
-  → src/handlers/assigned.ts — validate assignee is bot, extract issue
+issues.assigned webhook OR issues.labeled webhook (doobee:solve)
+  → src/handlers/assigned.ts or src/handlers/labeled.ts — validate trigger, extract issue
   → git.cloneIfMissing() — clone repo if first time, else fetch
   → config.loadConfig() — read .doobee.json from repo
   → queue.enqueue() — global single-job queue
@@ -67,13 +67,14 @@ pull_request.review_requested webhook (requested_reviewer is bot)
 **Install** (app installed on repo):
 ```
 installation.created / installation_repositories.added webhook
-  → src/handlers/install.ts — create doobee:stuck label on each repo
+  → src/handlers/install.ts — create doobee:stuck and doobee:solve labels on each repo
 ```
 
 ### Webhook events
 
-The server listens for exactly five events:
-- `issues.assigned` — triggers solve
+The server listens for exactly six events:
+- `issues.assigned` — triggers solve (when assignee is bot)
+- `issues.labeled` — triggers solve (when label is `doobee:solve`)
 - `pull_request_review.submitted` — triggers revise (only if "changes requested" on a bot PR)
 - `pull_request.review_requested` — triggers review (only if requested reviewer is bot)
 - `installation.created` — creates labels
@@ -100,6 +101,7 @@ Every solve/revise creates a git worktree for isolation. Worktrees live at `<rep
 - `src/commands.ts` — Shared `runCommands` helper for lifecycle commands.
 - `src/review-pr.ts` — PR review flow: worktree → diff → Claude → inline comments.
 - `src/handlers/assigned.ts` — Handle `issues.assigned` webhook.
+- `src/handlers/labeled.ts` — Handle `issues.labeled` webhook (doobee:solve label).
 - `src/handlers/review.ts` — Handle `pull_request_review.submitted` webhook.
 - `src/handlers/review-requested.ts` — Handle `pull_request.review_requested` webhook.
 - `src/handlers/install.ts` — Handle `installation.created` and `installation_repositories.added` webhooks.
@@ -163,10 +165,10 @@ If `.doobee.json` is missing, defaults are used. If it exists but is invalid JSO
 ### GitHub App
 
 - Bot identity: `doobeebot[bot]` (configurable via `BOT_NAME` env var).
-- Trigger: user assigns issue to the bot.
+- Solve triggers: user assigns issue to the bot, or adds the `doobee:solve` label.
 - Revision trigger: reviewer submits "Request changes" on a bot PR.
 - Review trigger: user adds bot as a reviewer on a PR.
-- Only label: `doobee:stuck` — added when Claude can't resolve an issue or revision.
+- Labels: `doobee:stuck` (added when Claude can't resolve), `doobee:solve` (trigger to start solving).
 - On stuck: bot unassigns itself, comments with reason, adds `doobee:stuck`.
 
 ### Claude Invocation
