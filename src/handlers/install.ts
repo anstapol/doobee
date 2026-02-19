@@ -37,5 +37,13 @@ export async function handleInstall(event: InstallEvent, github: GitHub): Promis
       color: "0E8A16",
       description: "Trigger Doobee to solve this issue",
     })
+
+    await ensureLabel(octokit, {
+      owner,
+      repo: name,
+      name: "doobee:in-progress",
+      color: "0075CA",
+      description: "Doobee is currently working on this issue",
+    })
   }
 }

@@ -10,7 +10,7 @@ import {
   removeWorktree,
 } from "./git"
 import type { GitHub } from "./github"
-import { addLabel, fetchReviews, postComment } from "./github"
+import { addLabel, fetchReviews, postComment, removeLabel } from "./github"
 import type { DoobeeConfig, PullRequest } from "./types"
 
 export interface ReviseContext {
@@ -25,6 +25,14 @@ export interface ReviseContext {
 export async function revise(ctx: ReviseContext): Promise<void> {
   const { pr, reviewId, installationId, github, config, repoDir } = ctx
   const octokit = await github.api(installationId)
+
+  // Add in-progress label
+  await addLabel(octokit, {
+    owner: pr.repoOwner,
+    repo: pr.repoName,
+    issueNumber: pr.number,
+    label: "doobee:in-progress",
+  })
 
   // 1. Configure auth and fetch origin
   const token = await github.token(installationId)
@@ -44,6 +52,12 @@ export async function revise(ctx: ReviseContext): Promise<void> {
       issueNumber: pr.number,
       body: `Failed to fetch origin: ${fetchResult.error}`,
     })
+    await removeLabel(octokit, {
+      owner: pr.repoOwner,
+      repo: pr.repoName,
+      issueNumber: pr.number,
+      label: "doobee:in-progress",
+    })
     return
   }
 
@@ -62,6 +76,12 @@ export async function revise(ctx: ReviseContext): Promise<void> {
       repo: pr.repoName,
       issueNumber: pr.number,
       body: `Failed to create worktree: ${wtResult.error}`,
+    })
+    await removeLabel(octokit, {
+      owner: pr.repoOwner,
+      repo: pr.repoName,
+      issueNumber: pr.number,
+      label: "doobee:in-progress",
     })
     return
   }
@@ -123,11 +143,18 @@ export async function revise(ctx: ReviseContext): Promise<void> {
       })
     }
   } finally {
-    // 7. Run stop commands (only if start succeeded)
+    // 7. Remove in-progress label
+    await removeLabel(octokit, {
+      owner: pr.repoOwner,
+      repo: pr.repoName,
+      issueNumber: pr.number,
+      label: "doobee:in-progress",
+    })
+    // 8. Run stop commands (only if start succeeded)
     if (started) {
       await runCommands(config.commands.stop, wtPath)
     }
-    // 8. Clean up worktree
+    // 9. Clean up worktree
     await removeWorktree(repoDir, pr.branch)
   }
 }

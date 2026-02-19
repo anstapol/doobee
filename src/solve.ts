@@ -17,6 +17,7 @@ import {
   fetchParent,
   fetchSubIssues,
   postComment,
+  removeLabel,
   unassignIssue,
 } from "./github"
 import type { DoobeeConfig, Issue, SubIssueGroup } from "./types"
@@ -27,6 +28,7 @@ export interface SolveContext {
   github: GitHub
   config: DoobeeConfig
   repoDir: string
+  extraContext?: string
 }
 
 async function markStuck(
@@ -56,9 +58,23 @@ async function markStuck(
 }
 
 export async function solve(ctx: SolveContext): Promise<void> {
-  const { issue, installationId, github, config, repoDir } = ctx
+  const { issue, installationId, github, config, repoDir, extraContext } = ctx
   const octokit = await github.api(installationId)
   const botLogin = process.env.BOT_NAME ?? "doobeebot[bot]"
+
+  // Add in-progress label and remove solve trigger
+  await addLabel(octokit, {
+    owner: issue.repoOwner,
+    repo: issue.repoName,
+    issueNumber: issue.number,
+    label: "doobee:in-progress",
+  })
+  await removeLabel(octokit, {
+    owner: issue.repoOwner,
+    repo: issue.repoName,
+    issueNumber: issue.number,
+    label: "doobee:solve",
+  })
 
   // 1. Configure auth and fetch origin
   const token = await github.token(installationId)
@@ -67,6 +83,12 @@ export async function solve(ctx: SolveContext): Promise<void> {
   if (!fetchResult.ok) {
     console.error(`[solve] Fetch failed: ${fetchResult.error}`)
     await markStuck(octokit, issue, `Failed to fetch origin: ${fetchResult.error}`, botLogin)
+    await removeLabel(octokit, {
+      owner: issue.repoOwner,
+      repo: issue.repoName,
+      issueNumber: issue.number,
+      label: "doobee:in-progress",
+    })
     return
   }
 
@@ -102,6 +124,12 @@ export async function solve(ctx: SolveContext): Promise<void> {
   if (!wtResult.ok) {
     console.error(`[solve] Failed to create worktree: ${wtResult.error}`)
     await markStuck(octokit, issue, `Failed to create worktree: ${wtResult.error}`, botLogin)
+    await removeLabel(octokit, {
+      owner: issue.repoOwner,
+      repo: issue.repoName,
+      issueNumber: issue.number,
+      label: "doobee:in-progress",
+    })
     return
   }
   const wtPath = wtResult.value
@@ -119,7 +147,7 @@ export async function solve(ctx: SolveContext): Promise<void> {
 
     for (const current of group.issues) {
       const sha = await getCurrentSha(wtPath)
-      const prompt = buildSolvePrompt(current, config)
+      const prompt = buildSolvePrompt(current, config, extraContext)
       const systemPrompt = buildSystemPrompt(config)
 
       console.log(`[solve] Running Claude for issue #${current.number}`)
@@ -194,11 +222,18 @@ export async function solve(ctx: SolveContext): Promise<void> {
       }
     }
   } finally {
-    // 7. Run stop commands (only if start succeeded)
+    // 7. Remove in-progress label
+    await removeLabel(octokit, {
+      owner: issue.repoOwner,
+      repo: issue.repoName,
+      issueNumber: issue.number,
+      label: "doobee:in-progress",
+    })
+    // 8. Run stop commands (only if start succeeded)
     if (started) {
       await runCommands(config.commands.stop, wtPath)
     }
-    // 8. Clean up worktree
+    // 9. Clean up worktree
     await removeWorktree(repoDir, group.branch)
   }
 }

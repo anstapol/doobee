@@ -16,10 +16,11 @@ export interface ReviewPrContext {
   github: GitHub
   config: DoobeeConfig
   repoDir: string
+  extraContext?: string
 }
 
 export async function reviewPr(ctx: ReviewPrContext): Promise<void> {
-  const { pr, baseBranch, installationId, github, config, repoDir } = ctx
+  const { pr, baseBranch, installationId, github, config, repoDir, extraContext } = ctx
   const octokit = await github.api(installationId)
 
   // 1. Configure auth and fetch origin
@@ -64,7 +65,7 @@ export async function reviewPr(ctx: ReviewPrContext): Promise<void> {
     }
 
     // 4. Run Claude
-    const prompt = buildReviewPrompt(pr, diffResult.value, config)
+    const prompt = buildReviewPrompt(pr, diffResult.value, config, extraContext)
     const systemPrompt = buildReviewSystemPrompt()
 
     console.log(`[review-pr] Running Claude for PR #${pr.number}`)

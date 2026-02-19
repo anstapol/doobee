@@ -8,7 +8,7 @@ GitHub App that resolves issues autonomously. Listens for webhooks, spawns Claud
 GitHub webhook → Bun HTTP server → Job queue → Claude Code CLI → PR
 ```
 
-1. You assign an issue to `doobeebot[bot]` or add the `doobee:solve` label
+1. You assign an issue to `doobeebot[bot]`, add the `doobee:solve` label, or comment `@doobeebot solve`
 2. GitHub sends a webhook to the Doobee server
 3. Doobee clones the repo (if first time), creates a git worktree on a new branch
 4. Runs your setup/start commands, then spawns Claude Code with the issue as a prompt
@@ -22,9 +22,18 @@ For sub-issues (GitHub's native hierarchy), Doobee detects the parent, fetches a
 
 When a reviewer submits "Request changes" on a Doobee PR, the webhook fires again. Doobee checks out the existing PR branch, reads all review comments (including inline feedback with file paths, line numbers, and diff context), spawns Claude to address them, and pushes fixes to the same branch.
 
+### Comment commands
+
+Comment on an issue or PR to trigger Doobee directly:
+
+- `@doobeebot solve` — on an issue, triggers solve (same as assigning or labeling)
+- `@doobeebot review` — on a PR, triggers a code review
+- `@doobeebot` — defaults to `solve` on issues, `review` on PRs
+- `@doobeebot solve focus on the API layer` — text after the command becomes extra context in Claude's prompt
+
 ### PR Reviews
 
-Add `doobeebot[bot]` as a reviewer on any PR and Doobee will review it. Doobee checks out the PR branch, diffs it against the base branch, and spawns Claude to review the changes. Claude posts inline comments focusing on correctness, bugs, and logic errors — not style. If the code looks clean, no comments are posted. This is non-critical: if the review fails, it's logged but doesn't affect the PR.
+Add `doobeebot[bot]` as a reviewer on any PR (or comment `@doobeebot review`) and Doobee will review it. Doobee checks out the PR branch, diffs it against the base branch, and spawns Claude to review the changes. Claude posts inline comments focusing on correctness, bugs, and logic errors — not style. If the code looks clean, no comments are posted. This is non-critical: if the review fails, it's logged but doesn't affect the PR.
 
 ### When it gets stuck
 
@@ -107,13 +116,14 @@ bun install
    - **Contents**: Read & write (to push branches)
 5. Subscribe to these **events**:
    - Issues
+   - Issue comments
    - Pull request
    - Pull request review
 6. Generate a **private key** and download the `.pem` file
 7. Note the **App ID** from the app settings page
 8. Install the app on your repos
 
-When installed, Doobee automatically creates the `doobee:stuck` and `doobee:solve` labels on each repo.
+When installed, Doobee automatically creates the `doobee:stuck`, `doobee:solve`, and `doobee:in-progress` labels on each repo.
 
 ### Environment
 
@@ -195,8 +205,9 @@ All fields are optional. If `.doobee.json` is missing, defaults are used. See `s
 |---|---|---|
 | `doobee:solve` | Issue | Trigger Doobee to solve this issue |
 | `doobee:stuck` | Issue/PR | Doobee couldn't resolve this |
+| `doobee:in-progress` | Issue/PR | Doobee is currently working on this |
 
-Both labels are created automatically when the app is installed.
+All labels are created automatically when the app is installed.
 
 ### Branch naming
 
