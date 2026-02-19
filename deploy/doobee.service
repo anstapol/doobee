@@ -15,12 +15,5 @@ RestartSec=5
 # claude CLI lives in ~/.bun/bin — must be on PATH for Bun.spawn
 Environment=PATH=/home/doobee/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-# Security hardening
-NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=read-only
-ReadWritePaths=/home/doobee/repos /home/doobee/.claude /home/doobee/.bun /home/doobee/doobee/repos
-PrivateTmp=true
-
 [Install]
 WantedBy=multi-user.target
