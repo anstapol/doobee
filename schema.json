@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/anstapol/doobee/doobee.schema.json",
+  "$id": "https://raw.githubusercontent.com/anstapol/doobee/main/schema.json",
   "title": "Doobee Configuration",
   "description": "Configuration for the Doobee automated issue resolver",
   "type": "object",
