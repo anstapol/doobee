@@ -20,7 +20,7 @@ export async function handleInstall(event: InstallEvent, github: GitHub): Promis
 
   for (const repo of repos) {
     const [owner, name] = repo.full_name.split("/")
-    console.log(`[install] Ensuring doobee:stuck label in ${owner}/${name}`)
+    console.log(`[install] Ensuring labels in ${owner}/${name}`)
 
     await ensureLabel(octokit, {
       owner,
@@ -28,6 +28,14 @@ export async function handleInstall(event: InstallEvent, github: GitHub): Promis
       name: "doobee:stuck",
       color: "D93F0B",
       description: "Doobee could not resolve this issue",
+    })
+
+    await ensureLabel(octokit, {
+      owner,
+      repo: name,
+      name: "doobee:solve",
+      color: "0E8A16",
+      description: "Trigger Doobee to solve this issue",
     })
   }
 }

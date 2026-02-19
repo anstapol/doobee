@@ -8,7 +8,7 @@ GitHub App that resolves issues autonomously. Listens for webhooks, spawns Claud
 GitHub webhook → Bun HTTP server → Job queue → Claude Code CLI → PR
 ```
 
-1. You assign an issue to `doobeebot[bot]`
+1. You assign an issue to `doobeebot[bot]` or add the `doobee:solve` label
 2. GitHub sends a webhook to the Doobee server
 3. Doobee clones the repo (if first time), creates a git worktree on a new branch
 4. Runs your setup/start commands, then spawns Claude Code with the issue as a prompt
@@ -34,11 +34,11 @@ If Claude can't resolve an issue after `maxRetries` attempts, Doobee:
 - Unassigns itself from the issue
 - Skips any remaining sub-issues in the group
 
-To retry: remove `doobee:stuck`, fix the issue description if needed, and re-assign to the bot.
+To retry: remove `doobee:stuck`, fix the issue description if needed, and re-assign to the bot or re-add the `doobee:solve` label.
 
 ### Job queue
 
-Global single-job queue — one Claude session at a time. The queue is in-memory — if the server restarts, queued jobs are lost, but you can re-trigger by re-assigning the issue.
+Global single-job queue — one Claude session at a time. The queue is in-memory — if the server restarts, queued jobs are lost, but you can re-trigger by re-assigning the issue or re-adding the `doobee:solve` label.
 
 ## Local usage
 
@@ -113,7 +113,7 @@ bun install
 7. Note the **App ID** from the app settings page
 8. Install the app on your repos
 
-When installed, Doobee automatically creates the `doobee:stuck` label on each repo.
+When installed, Doobee automatically creates the `doobee:stuck` and `doobee:solve` labels on each repo.
 
 ### Environment
 
@@ -193,9 +193,10 @@ All fields are optional. If `.doobee.json` is missing, defaults are used. See `s
 
 | Label | Where | Meaning |
 |---|---|---|
+| `doobee:solve` | Issue | Trigger Doobee to solve this issue |
 | `doobee:stuck` | Issue/PR | Doobee couldn't resolve this |
 
-This is the only label Doobee uses. Created automatically when the app is installed.
+Both labels are created automatically when the app is installed.
 
 ### Branch naming
 
