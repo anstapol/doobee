@@ -45,6 +45,7 @@ export interface DoobeeConfig {
     fix: string[]
   }
   maxRetries: number
+  timeout: number
   promptContext?: string
   model?: string
 }

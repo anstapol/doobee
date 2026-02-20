@@ -176,6 +176,7 @@ Create `.doobee.json` in your repo root to configure Doobee's behavior for that 
     "fix": ["npm run lint:fix"]
   },
   "maxRetries": 3,
+  "timeout": 3600,
   "model": "claude-sonnet-4-5-20250929",
   "promptContext": "This is a Next.js app with Prisma ORM."
 }
@@ -192,6 +193,7 @@ All fields are optional. If `.doobee.json` is missing, defaults are used. See `s
 | `commands.verify` | `[]` | Passed to Claude's prompt — Claude runs these to verify the build |
 | `commands.fix` | `[]` | Passed to Claude's prompt — Claude runs these to auto-fix lint/format |
 | `maxRetries` | `3` | Attempts before Claude gives up and marks stuck |
+| `timeout` | `3600` | Max seconds for a Claude invocation before it is killed |
 | `model` | — | Claude model override (e.g. `claude-sonnet-4-5-20250929`) |
 | `promptContext` | — | Extra context injected into Claude's prompt (repo conventions, stack info) |
 

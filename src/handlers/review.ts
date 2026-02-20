@@ -47,7 +47,7 @@ export async function handleReview(
   const config = await loadConfig(repoDir)
 
   queue.enqueue({
-    id: `revise-${pr.number}`,
+    id: `revise-${owner}/${repo}#${pr.number}`,
     run: () =>
       revise({
         pr,

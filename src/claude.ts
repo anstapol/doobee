@@ -10,6 +10,7 @@ export async function runClaude(opts: {
   systemPrompt: string
   cwd: string
   model?: string
+  timeout?: number
 }): Promise<ClaudeResult> {
   const args = [
     "claude",
@@ -31,11 +32,15 @@ export async function runClaude(opts: {
     stderr: "pipe",
   })
 
+  const timeoutMs = (opts.timeout ?? 3600) * 1000
+  const timer = setTimeout(() => proc.kill(), timeoutMs)
+
   const [stdout, stderr] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),
   ])
   const exitCode = await proc.exited
+  clearTimeout(timer)
   const output = stdout + stderr
 
   if (output.includes("[DOOBEE:STUCK]")) {
@@ -48,6 +53,12 @@ export async function runClaude(opts: {
     return { status: "crashed", output }
   }
   return { status: "solved", output }
+}
+
+export function formatOutput(output: string): string {
+  const maxLen = 5000
+  const trimmed = output.length > maxLen ? `...(truncated)\n${output.slice(-maxLen)}` : output
+  return `\n\n<details><summary>Output</summary>\n\n\`\`\`\n${trimmed}\n\`\`\`\n</details>`
 }
 
 export function buildSolvePrompt(
