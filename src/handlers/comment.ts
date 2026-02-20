@@ -67,7 +67,7 @@ export async function handleComment(
     console.log(`[comment] Solve triggered for issue #${issue.number} in ${owner}/${repo}`)
 
     queue.enqueue({
-      id: `solve-${issue.number}`,
+      id: `solve-${owner}/${repo}#${issue.number}`,
       run: () =>
         solve({
           issue,
@@ -97,7 +97,7 @@ export async function handleComment(
     console.log(`[comment] Review triggered for PR #${pr.number} in ${owner}/${repo}`)
 
     queue.enqueue({
-      id: `review-pr-${pr.number}`,
+      id: `review-pr-${owner}/${repo}#${pr.number}`,
       run: () =>
         reviewPr({
           pr,

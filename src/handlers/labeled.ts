@@ -42,7 +42,7 @@ export async function handleLabeled(
   const config = await loadConfig(repoDir)
 
   queue.enqueue({
-    id: `solve-${issue.number}`,
+    id: `solve-${owner}/${repo}#${issue.number}`,
     run: () =>
       solve({
         issue,

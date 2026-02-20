@@ -1,5 +1,5 @@
 import type { Octokit } from "@octokit/core"
-import { buildSolvePrompt, buildSystemPrompt, runClaude } from "./claude"
+import { buildSolvePrompt, buildSystemPrompt, formatOutput, runClaude } from "./claude"
 import { runCommands } from "./commands"
 import {
   configureAuth,
@@ -156,6 +156,7 @@ export async function solve(ctx: SolveContext): Promise<void> {
         systemPrompt,
         cwd: wtPath,
         model: config.model,
+        timeout: config.timeout,
       })
 
       if (result.status === "solved") {
@@ -168,8 +169,8 @@ export async function solve(ctx: SolveContext): Promise<void> {
         // stuck or crashed
         const reason =
           result.status === "stuck"
-            ? `Claude got stuck on this issue.`
-            : `Claude crashed while working on this issue.`
+            ? `Claude got stuck on this issue.${formatOutput(result.output)}`
+            : `Claude crashed while working on this issue.${formatOutput(result.output)}`
         await markStuck(octokit, current, reason, botLogin)
 
         // Mark remaining issues as blocked
@@ -219,6 +220,18 @@ export async function solve(ctx: SolveContext): Promise<void> {
         }
       } else {
         console.error(`[solve] Push failed: ${pushResult.error}`)
+        await postComment(octokit, {
+          owner: issue.repoOwner,
+          repo: issue.repoName,
+          issueNumber: issue.number,
+          body: `Push failed after Claude committed changes.\n\n\`\`\`\n${pushResult.error}\n\`\`\``,
+        })
+        await addLabel(octokit, {
+          owner: issue.repoOwner,
+          repo: issue.repoName,
+          issueNumber: issue.number,
+          label: "doobee:stuck",
+        })
       }
     }
   } finally {

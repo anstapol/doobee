@@ -164,6 +164,7 @@ Defaults (from `src/config.ts`):
 - `baseBranch`: `"main"`
 - `commands`: all empty arrays
 - `maxRetries`: `3`
+- `timeout`: `3600` (seconds)
 
 If `.doobee.json` is missing, defaults are used. If it exists but is invalid JSON, throw.
 

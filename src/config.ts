@@ -11,6 +11,7 @@ export const DEFAULT_CONFIG: DoobeeConfig = {
     fix: [],
   },
   maxRetries: 3,
+  timeout: 3600,
 }
 
 export async function loadConfig(repoDir: string): Promise<DoobeeConfig> {
@@ -43,6 +44,7 @@ export async function loadConfig(repoDir: string): Promise<DoobeeConfig> {
       fix: partial.commands?.fix ?? DEFAULT_CONFIG.commands.fix,
     },
     maxRetries: partial.maxRetries ?? DEFAULT_CONFIG.maxRetries,
+    timeout: partial.timeout ?? DEFAULT_CONFIG.timeout,
     promptContext: partial.promptContext,
     model: partial.model,
   }

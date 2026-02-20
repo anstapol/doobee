@@ -1,6 +1,7 @@
 import {
   buildReviewPrompt,
   buildReviewSystemPrompt,
+  formatOutput,
   parseReviewComments,
   runClaude,
 } from "./claude"
@@ -74,6 +75,7 @@ export async function reviewPr(ctx: ReviewPrContext): Promise<void> {
       systemPrompt,
       cwd: wtPath,
       model: config.model,
+      timeout: config.timeout,
     })
 
     if (result.status === "crashed") {
@@ -82,7 +84,7 @@ export async function reviewPr(ctx: ReviewPrContext): Promise<void> {
         owner: pr.repoOwner,
         repo: pr.repoName,
         issueNumber: pr.number,
-        body: `Could not complete PR review: Claude crashed.`,
+        body: `Could not complete PR review: Claude crashed.${formatOutput(result.output)}`,
       })
       return
     }

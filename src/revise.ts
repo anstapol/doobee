@@ -1,4 +1,4 @@
-import { buildRevisionPrompt, buildSystemPrompt, runClaude } from "./claude"
+import { buildRevisionPrompt, buildSystemPrompt, formatOutput, runClaude } from "./claude"
 import { runCommands } from "./commands"
 import {
   configureAuth,
@@ -113,6 +113,7 @@ export async function revise(ctx: ReviseContext): Promise<void> {
       systemPrompt,
       cwd: wtPath,
       model: config.model,
+      timeout: config.timeout,
     })
 
     // 6. Handle result
@@ -121,9 +122,20 @@ export async function revise(ctx: ReviseContext): Promise<void> {
       const pushToken = await github.token(installationId)
       await configureAuth(repoDir, pushToken)
       const pushResult = await push(wtPath, pr.branch)
-      if (pushResult.ok) {
-      } else {
+      if (!pushResult.ok) {
         console.error(`[revise] Push failed: ${pushResult.error}`)
+        await postComment(octokit, {
+          owner: pr.repoOwner,
+          repo: pr.repoName,
+          issueNumber: pr.number,
+          body: `Push failed after Claude committed changes.\n\n\`\`\`\n${pushResult.error}\n\`\`\``,
+        })
+        await addLabel(octokit, {
+          owner: pr.repoOwner,
+          repo: pr.repoName,
+          issueNumber: pr.number,
+          label: "doobee:stuck",
+        })
       }
     } else if (result.status === "complete") {
       // Review feedback already addressed
@@ -139,7 +151,7 @@ export async function revise(ctx: ReviseContext): Promise<void> {
         owner: pr.repoOwner,
         repo: pr.repoName,
         issueNumber: pr.number,
-        body: `Could not address review feedback. Status: ${result.status}`,
+        body: `Could not address review feedback. Status: ${result.status}${formatOutput(result.output)}`,
       })
     }
   } finally {

@@ -64,6 +64,12 @@
     "model": {
       "type": "string",
       "description": "Claude model to use (e.g. claude-sonnet-4-5-20250929, claude-opus-4-6)"
+    },
+    "timeout": {
+      "type": "integer",
+      "default": 3600,
+      "minimum": 60,
+      "description": "Maximum time in seconds for a Claude invocation before it is killed"
     }
   },
   "additionalProperties": false
