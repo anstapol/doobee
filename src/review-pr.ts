@@ -7,7 +7,7 @@ import {
 } from "./claude"
 import { configureAuth, createWorktree, fetch, getDiff, removeWorktree } from "./git"
 import type { GitHub } from "./github"
-import { postComment, submitReview } from "./github"
+import { postComment, removeLabel, submitReview } from "./github"
 import type { DoobeeConfig, PullRequest } from "./types"
 
 export interface ReviewPrContext {
@@ -23,6 +23,14 @@ export interface ReviewPrContext {
 export async function reviewPr(ctx: ReviewPrContext): Promise<void> {
   const { pr, baseBranch, installationId, github, config, repoDir, extraContext } = ctx
   const octokit = await github.api(installationId)
+
+  // Remove trigger label
+  await removeLabel(octokit, {
+    owner: pr.repoOwner,
+    repo: pr.repoName,
+    issueNumber: pr.number,
+    label: "doobee:review",
+  })
 
   // 1. Configure auth and fetch origin
   const token = await github.token(installationId)

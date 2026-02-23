@@ -108,6 +108,7 @@ export function buildRevisionPrompt(
   pr: PullRequest,
   reviews: ReviewComment[],
   config: DoobeeConfig,
+  extraContext?: string,
 ): string {
   const lines: string[] = [
     `# PR #${pr.number}: ${pr.title}`,
@@ -131,6 +132,10 @@ export function buildRevisionPrompt(
 
   if (config.promptContext) {
     lines.push("## Additional Context", "", config.promptContext, "")
+  }
+
+  if (extraContext) {
+    lines.push("## User Instructions", "", extraContext, "")
   }
 
   lines.push(
