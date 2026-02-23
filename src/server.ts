@@ -1,9 +1,9 @@
 import { resolve } from "node:path"
 import { createGitHub } from "./github"
-import { handleAssigned } from "./handlers/assigned"
 import { handleComment } from "./handlers/comment"
 import { handleInstall } from "./handlers/install"
 import { handleLabeled } from "./handlers/labeled"
+import { handlePrLabeled } from "./handlers/pr-labeled"
 import { handleReview } from "./handlers/review"
 import { handleReviewRequested } from "./handlers/review-requested"
 import { createQueue } from "./queue"
@@ -26,12 +26,12 @@ const queue = createQueue()
 
 const webhooks = github.app.webhooks
 
-webhooks.on("issues.assigned", async (event) => {
-  await handleAssigned(event, github, queue, reposDir, botName)
-})
-
 webhooks.on("issues.labeled", async (event) => {
   await handleLabeled(event, github, queue, reposDir)
+})
+
+webhooks.on("pull_request.labeled", async (event) => {
+  await handlePrLabeled(event, github, queue, reposDir)
 })
 
 webhooks.on("issue_comment.created", async (event) => {

@@ -11,15 +11,7 @@ import {
   removeWorktree,
 } from "./git"
 import type { GitHub } from "./github"
-import {
-  addLabel,
-  createPr,
-  fetchParent,
-  fetchSubIssues,
-  postComment,
-  removeLabel,
-  unassignIssue,
-} from "./github"
+import { addLabel, createPr, fetchParent, fetchSubIssues, postComment, removeLabel } from "./github"
 import type { DoobeeConfig, Issue, SubIssueGroup } from "./types"
 
 export interface SolveContext {
@@ -31,12 +23,7 @@ export interface SolveContext {
   extraContext?: string
 }
 
-async function markStuck(
-  octokit: Octokit,
-  issue: Issue,
-  reason: string,
-  botLogin: string,
-): Promise<void> {
+async function markStuck(octokit: Octokit, issue: Issue, reason: string): Promise<void> {
   await addLabel(octokit, {
     owner: issue.repoOwner,
     repo: issue.repoName,
@@ -49,18 +36,11 @@ async function markStuck(
     issueNumber: issue.number,
     body: reason,
   })
-  await unassignIssue(octokit, {
-    owner: issue.repoOwner,
-    repo: issue.repoName,
-    issueNumber: issue.number,
-    assignees: [botLogin],
-  })
 }
 
 export async function solve(ctx: SolveContext): Promise<void> {
   const { issue, installationId, github, config, repoDir, extraContext } = ctx
   const octokit = await github.api(installationId)
-  const botLogin = process.env.BOT_NAME ?? "doobeebot[bot]"
 
   // Add in-progress label and remove solve trigger
   await addLabel(octokit, {
@@ -82,7 +62,7 @@ export async function solve(ctx: SolveContext): Promise<void> {
   const fetchResult = await fetch(repoDir)
   if (!fetchResult.ok) {
     console.error(`[solve] Fetch failed: ${fetchResult.error}`)
-    await markStuck(octokit, issue, `Failed to fetch origin: ${fetchResult.error}`, botLogin)
+    await markStuck(octokit, issue, `Failed to fetch origin: ${fetchResult.error}`)
     await removeLabel(octokit, {
       owner: issue.repoOwner,
       repo: issue.repoName,
@@ -123,7 +103,7 @@ export async function solve(ctx: SolveContext): Promise<void> {
   const wtResult = await createWorktree(repoDir, group.branch, config.baseBranch)
   if (!wtResult.ok) {
     console.error(`[solve] Failed to create worktree: ${wtResult.error}`)
-    await markStuck(octokit, issue, `Failed to create worktree: ${wtResult.error}`, botLogin)
+    await markStuck(octokit, issue, `Failed to create worktree: ${wtResult.error}`)
     await removeLabel(octokit, {
       owner: issue.repoOwner,
       repo: issue.repoName,
@@ -171,17 +151,12 @@ export async function solve(ctx: SolveContext): Promise<void> {
           result.status === "stuck"
             ? `Claude got stuck on this issue.${formatOutput(result.output)}`
             : `Claude crashed while working on this issue.${formatOutput(result.output)}`
-        await markStuck(octokit, current, reason, botLogin)
+        await markStuck(octokit, current, reason)
 
         // Mark remaining issues as blocked
         const remaining = group.issues.slice(group.issues.indexOf(current) + 1)
         for (const blocked of remaining) {
-          await markStuck(
-            octokit,
-            blocked,
-            `Blocked by #${current.number} which is stuck.`,
-            botLogin,
-          )
+          await markStuck(octokit, blocked, `Blocked by #${current.number} which is stuck.`)
         }
 
         stuck = true

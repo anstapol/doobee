@@ -79,8 +79,20 @@ export async function removeWorktree(repoDir: string, branch: string): Promise<v
 }
 
 export async function push(worktreePath: string, branch: string): Promise<Result<void>> {
-  const result = await run(["git", "push", "origin", branch], worktreePath)
-  if (!result.ok) return result
+  const first = await run(["git", "push", "origin", branch], worktreePath)
+  if (first.ok) return { ok: true, value: undefined }
+
+  // Push rejected — likely remote has new commits. Pull with rebase and retry.
+  console.log(`[git] Push rejected, rebasing onto origin/${branch}`)
+  const pull = await run(["git", "pull", "--rebase", "origin", branch], worktreePath)
+  if (!pull.ok) {
+    // Rebase conflict — abort and report
+    await run(["git", "rebase", "--abort"], worktreePath)
+    return { ok: false, error: `Rebase failed (conflicts with remote):\n${pull.error}` }
+  }
+
+  const retry = await run(["git", "push", "origin", branch], worktreePath)
+  if (!retry.ok) return retry
   return { ok: true, value: undefined }
 }
 

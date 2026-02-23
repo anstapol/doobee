@@ -8,7 +8,7 @@ GitHub App that resolves issues autonomously. Listens for webhooks, spawns Claud
 GitHub webhook → Bun HTTP server → Job queue → Claude Code CLI → PR
 ```
 
-1. You assign an issue to `doobeebot[bot]`, add the `doobee:solve` label, or comment `@doobeebot solve`
+1. You add the `doobee:solve` label to an issue or comment `@doobeebot solve`
 2. GitHub sends a webhook to the Doobee server
 3. Doobee clones the repo (if first time), creates a git worktree on a new branch
 4. Runs your setup/start commands, then spawns Claude Code with the issue as a prompt
@@ -20,34 +20,36 @@ For sub-issues (GitHub's native hierarchy), Doobee detects the parent, fetches a
 
 ### Revisions
 
-When a reviewer submits "Request changes" on a Doobee PR, the webhook fires again. Doobee checks out the existing PR branch, reads all review comments (including inline feedback with file paths, line numbers, and diff context), spawns Claude to address them, and pushes fixes to the same branch.
+Add the `doobee:revise` label to a PR (or comment `@doobeebot revise`) to address review feedback. Doobee checks out the existing PR branch, reads all review comments (including inline feedback with file paths, line numbers, and diff context), spawns Claude to address them, and pushes fixes to the same branch.
+
+Revise also auto-triggers when a reviewer submits "Request changes" on a Doobee PR.
+
+### PR Reviews
+
+Add the `doobee:review` label to any PR, add `doobeebot[bot]` as a reviewer, or comment `@doobeebot review` and Doobee will review it. Doobee checks out the PR branch, diffs it against the base branch, and spawns Claude to review the changes. Claude posts inline comments focusing on correctness, bugs, and logic errors — not style. If the code looks clean, no comments are posted. This is non-critical: if the review fails, it's logged but doesn't affect the PR.
 
 ### Comment commands
 
 Comment on an issue or PR to trigger Doobee directly:
 
-- `@doobeebot solve` — on an issue, triggers solve (same as assigning or labeling)
+- `@doobeebot solve` — on an issue, triggers solve (same as labeling `doobee:solve`)
 - `@doobeebot review` — on a PR, triggers a code review
+- `@doobeebot revise` — on a PR, triggers revision (address all review feedback)
 - `@doobeebot` — defaults to `solve` on issues, `review` on PRs
 - `@doobeebot solve focus on the API layer` — text after the command becomes extra context in Claude's prompt
-
-### PR Reviews
-
-Add `doobeebot[bot]` as a reviewer on any PR (or comment `@doobeebot review`) and Doobee will review it. Doobee checks out the PR branch, diffs it against the base branch, and spawns Claude to review the changes. Claude posts inline comments focusing on correctness, bugs, and logic errors — not style. If the code looks clean, no comments are posted. This is non-critical: if the review fails, it's logged but doesn't affect the PR.
 
 ### When it gets stuck
 
 If Claude can't resolve an issue after `maxRetries` attempts, Doobee:
 - Adds the `doobee:stuck` label
 - Posts a comment explaining why
-- Unassigns itself from the issue
 - Skips any remaining sub-issues in the group
 
-To retry: remove `doobee:stuck`, fix the issue description if needed, and re-assign to the bot or re-add the `doobee:solve` label.
+To retry: remove `doobee:stuck`, fix the issue description if needed, and re-add the `doobee:solve` label.
 
 ### Job queue
 
-Global single-job queue — one Claude session at a time. The queue is in-memory — if the server restarts, queued jobs are lost, but you can re-trigger by re-assigning the issue or re-adding the `doobee:solve` label.
+Global single-job queue — one Claude session at a time. The queue is in-memory — if the server restarts, queued jobs are lost, but you can re-trigger by re-adding the appropriate label (`doobee:solve`, `doobee:review`, or `doobee:revise`).
 
 ## Local usage
 
@@ -111,8 +113,8 @@ bun install
 2. Set the **webhook URL** to `https://your-server:4567/webhook`
 3. Set a **webhook secret** (random string — you'll need it for `WEBHOOK_SECRET`)
 4. Enable these **permissions**:
-   - **Issues**: Read & write (to label, comment, assign/unassign)
-   - **Pull requests**: Read & write (to create PRs, read reviews)
+   - **Issues**: Read & write (to label, comment)
+   - **Pull requests**: Read & write (to create PRs, read reviews, label)
    - **Contents**: Read & write (to push branches)
 5. Subscribe to these **events**:
    - Issues
@@ -123,7 +125,7 @@ bun install
 7. Note the **App ID** from the app settings page
 8. Install the app on your repos
 
-When installed, Doobee automatically creates the `doobee:stuck`, `doobee:solve`, and `doobee:in-progress` labels on each repo.
+When installed, Doobee automatically creates the `doobee:stuck`, `doobee:solve`, `doobee:in-progress`, `doobee:review`, and `doobee:revise` labels on each repo.
 
 ### Environment
 
@@ -206,10 +208,12 @@ All fields are optional. If `.doobee.json` is missing, defaults are used. See `s
 | Label | Where | Meaning |
 |---|---|---|
 | `doobee:solve` | Issue | Trigger Doobee to solve this issue |
+| `doobee:review` | PR | Trigger Doobee to review this PR |
+| `doobee:revise` | PR | Trigger Doobee to address review feedback on this PR |
 | `doobee:stuck` | Issue/PR | Doobee couldn't resolve this |
 | `doobee:in-progress` | Issue/PR | Doobee is currently working on this |
 
-All labels are created automatically when the app is installed.
+All labels are created automatically when the app is installed. Trigger labels (`doobee:solve`, `doobee:review`, `doobee:revise`) are removed when the job starts, so re-adding re-triggers the action.
 
 ### Branch naming
 
