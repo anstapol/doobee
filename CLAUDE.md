@@ -175,6 +175,7 @@ If `.doobee.json` is missing, defaults are used. If it exists but is invalid JSO
 - Commits by Claude: `ISSUE #<number>: <description>`.
 - Revision commits by Claude: `PR #<number>: address review feedback`.
 - Use `git worktree` for parallel isolation. Never mutate the main checkout.
+- Push rebases onto remote if the branch has diverged (e.g., from a previous revise or manual edit). If rebase has conflicts, the push fails and reports the error.
 - Never force-push.
 - Repos are cloned to `<REPOS_DIR>/<owner>/<repo>`.
 
