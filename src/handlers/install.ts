@@ -43,7 +43,23 @@ export async function handleInstall(event: InstallEvent, github: GitHub): Promis
       repo: name,
       name: "doobee:in-progress",
       color: "0075CA",
-      description: "Doobee is currently working on this issue",
+      description: "Doobee is currently working on this",
+    })
+
+    await ensureLabel(octokit, {
+      owner,
+      repo: name,
+      name: "doobee:review",
+      color: "5319E7",
+      description: "Trigger Doobee to review this PR",
+    })
+
+    await ensureLabel(octokit, {
+      owner,
+      repo: name,
+      name: "doobee:revise",
+      color: "FBCA04",
+      description: "Trigger Doobee to address review feedback on this PR",
     })
   }
 }

@@ -7,6 +7,7 @@ import { fetchPr } from "../github"
 import { parseCommand } from "../parse-command"
 import type { JobQueue } from "../queue"
 import { reviewPr } from "../review-pr"
+import { revise } from "../revise"
 import { solve } from "../solve"
 import type { Issue } from "../types"
 
@@ -46,8 +47,8 @@ export async function handleComment(
     return
   }
 
-  if (parsed.command === "review" && !isPullRequest) {
-    console.log(`[comment] Ignoring review command on issue #${payload.issue.number}`)
+  if ((parsed.command === "review" || parsed.command === "revise") && !isPullRequest) {
+    console.log(`[comment] Ignoring ${parsed.command} command on issue #${payload.issue.number}`)
     return
   }
 
@@ -79,7 +80,7 @@ export async function handleComment(
         }),
     })
   } else {
-    // review command on a PR
+    // review or revise command on a PR
     const octokit = await github.api(installationId)
     const prResult = await fetchPr(octokit, {
       owner,
@@ -94,20 +95,37 @@ export async function handleComment(
 
     const { pr, baseBranch } = prResult.value
 
-    console.log(`[comment] Review triggered for PR #${pr.number} in ${owner}/${repo}`)
+    if (parsed.command === "revise") {
+      console.log(`[comment] Revise triggered for PR #${pr.number} in ${owner}/${repo}`)
 
-    queue.enqueue({
-      id: `review-pr-${owner}/${repo}#${pr.number}`,
-      run: () =>
-        reviewPr({
-          pr,
-          baseBranch,
-          installationId,
-          github,
-          config,
-          repoDir,
-          extraContext,
-        }),
-    })
+      queue.enqueue({
+        id: `revise-${owner}/${repo}#${pr.number}`,
+        run: () =>
+          revise({
+            pr,
+            installationId,
+            github,
+            config,
+            repoDir,
+            extraContext,
+          }),
+      })
+    } else {
+      console.log(`[comment] Review triggered for PR #${pr.number} in ${owner}/${repo}`)
+
+      queue.enqueue({
+        id: `review-pr-${owner}/${repo}#${pr.number}`,
+        run: () =>
+          reviewPr({
+            pr,
+            baseBranch,
+            installationId,
+            github,
+            config,
+            repoDir,
+            extraContext,
+          }),
+      })
+    }
   }
 }

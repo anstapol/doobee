@@ -10,28 +10,35 @@ import {
   removeWorktree,
 } from "./git"
 import type { GitHub } from "./github"
-import { addLabel, fetchReviews, postComment, removeLabel } from "./github"
+import { addLabel, fetchAllReviews, fetchReviews, postComment, removeLabel } from "./github"
 import type { DoobeeConfig, PullRequest } from "./types"
 
 export interface ReviseContext {
   pr: PullRequest
-  reviewId: number
+  reviewId?: number
   installationId: number
   github: GitHub
   config: DoobeeConfig
   repoDir: string
+  extraContext?: string
 }
 
 export async function revise(ctx: ReviseContext): Promise<void> {
-  const { pr, reviewId, installationId, github, config, repoDir } = ctx
+  const { pr, reviewId, installationId, github, config, repoDir, extraContext } = ctx
   const octokit = await github.api(installationId)
 
-  // Add in-progress label
+  // Add in-progress label and remove trigger label
   await addLabel(octokit, {
     owner: pr.repoOwner,
     repo: pr.repoName,
     issueNumber: pr.number,
     label: "doobee:in-progress",
+  })
+  await removeLabel(octokit, {
+    owner: pr.repoOwner,
+    repo: pr.repoName,
+    issueNumber: pr.number,
+    label: "doobee:revise",
   })
 
   // 1. Configure auth and fetch origin
@@ -90,12 +97,18 @@ export async function revise(ctx: ReviseContext): Promise<void> {
   let started = false
   try {
     // 3. Fetch review comments
-    const reviews = await fetchReviews(octokit, {
-      owner: pr.repoOwner,
-      repo: pr.repoName,
-      prNumber: pr.number,
-      reviewId,
-    })
+    const reviews = reviewId
+      ? await fetchReviews(octokit, {
+          owner: pr.repoOwner,
+          repo: pr.repoName,
+          prNumber: pr.number,
+          reviewId,
+        })
+      : await fetchAllReviews(octokit, {
+          owner: pr.repoOwner,
+          repo: pr.repoName,
+          prNumber: pr.number,
+        })
 
     // 4. Run setup and start commands
     await runCommands(config.commands.setup, wtPath)
@@ -103,7 +116,7 @@ export async function revise(ctx: ReviseContext): Promise<void> {
     started = true
 
     // 5. Build prompts and run Claude
-    const prompt = buildRevisionPrompt(pr, reviews, config)
+    const prompt = buildRevisionPrompt(pr, reviews, config, extraContext)
     const systemPrompt = buildSystemPrompt(config)
     const sha = await getCurrentSha(wtPath)
 
