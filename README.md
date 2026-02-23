@@ -26,7 +26,7 @@ Revise also auto-triggers when a reviewer submits "Request changes" on a Doobee 
 
 ### PR Reviews
 
-Add the `doobee:review` label to any PR (or comment `@doobeebot review`) and Doobee will review it. Doobee checks out the PR branch, diffs it against the base branch, and spawns Claude to review the changes. Claude posts inline comments focusing on correctness, bugs, and logic errors — not style. If the code looks clean, no comments are posted. This is non-critical: if the review fails, it's logged but doesn't affect the PR.
+Add the `doobee:review` label to any PR, add `doobeebot[bot]` as a reviewer, or comment `@doobeebot review` and Doobee will review it. Doobee checks out the PR branch, diffs it against the base branch, and spawns Claude to review the changes. Claude posts inline comments focusing on correctness, bugs, and logic errors — not style. If the code looks clean, no comments are posted. This is non-critical: if the review fails, it's logged but doesn't affect the PR.
 
 ### Comment commands
 
