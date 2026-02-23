@@ -97,18 +97,6 @@ export async function postComment(
   })
 }
 
-export async function unassignIssue(
-  octokit: Octokit,
-  opts: { owner: string; repo: string; issueNumber: number; assignees: string[] },
-): Promise<void> {
-  await octokit.request("DELETE /repos/{owner}/{repo}/issues/{issue_number}/assignees", {
-    owner: opts.owner,
-    repo: opts.repo,
-    issue_number: opts.issueNumber,
-    assignees: opts.assignees,
-  })
-}
-
 export async function fetchReviews(
   octokit: Octokit,
   opts: { owner: string; repo: string; prNumber: number; reviewId: number },
@@ -160,6 +148,66 @@ export async function fetchReviews(
 
     if (inline.length < 100) break
     page++
+  }
+
+  return comments
+}
+
+export async function fetchAllReviews(
+  octokit: Octokit,
+  opts: { owner: string; repo: string; prNumber: number },
+): Promise<ReviewComment[]> {
+  const comments: ReviewComment[] = []
+
+  // Fetch all reviews on the PR
+  const { data: reviews } = await octokit.request(
+    "GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews",
+    {
+      owner: opts.owner,
+      repo: opts.repo,
+      pull_number: opts.prNumber,
+    },
+  )
+
+  // Collect comments from all reviews that requested changes
+  const changesRequested = reviews.filter((r: { state: string }) => r.state === "CHANGES_REQUESTED")
+
+  for (const review of changesRequested) {
+    if (review.body) {
+      comments.push({
+        author: review.user?.login ?? "unknown",
+        body: review.body,
+      })
+    }
+
+    // Fetch inline comments for this review (paginated)
+    let page = 1
+    while (true) {
+      const { data: inline } = await octokit.request(
+        "GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/comments",
+        {
+          owner: opts.owner,
+          repo: opts.repo,
+          pull_number: opts.prNumber,
+          review_id: review.id,
+          per_page: 100,
+          page,
+        },
+      )
+
+      for (const comment of inline) {
+        comments.push({
+          author: comment.user?.login ?? "unknown",
+          body: comment.body,
+          path: comment.path,
+          line: comment.line ?? undefined,
+          diffHunk: comment.diff_hunk,
+        })
+      }
+
+      if (inline.length < 100) break
+      page++
+    }
   }
 
   return comments

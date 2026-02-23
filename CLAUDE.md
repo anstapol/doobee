@@ -8,14 +8,14 @@ GitHub App that resolves issues autonomously. Listens for webhooks, spawns Claud
 GitHub webhook → Bun HTTP server → Job queue → Claude Code CLI
 ```
 
-Event-driven. No polling, no cron. A user assigns an issue to `doobeebot[bot]`, adds the `doobee:solve` label, or comments `@doobeebot solve`, the webhook fires, Claude solves it, a PR appears.
+Event-driven. No polling, no cron. A user adds the `doobee:solve` label or comments `@doobeebot solve`, the webhook fires, Claude solves it, a PR appears. Labels are the primary trigger; comments allow passing extra context.
 
 ### Data flow
 
 **Solve** (issue → PR):
 ```
-issues.assigned webhook OR issues.labeled webhook (doobee:solve)
-  → src/handlers/assigned.ts or src/handlers/labeled.ts — validate trigger, extract issue
+issues.labeled webhook (doobee:solve)
+  → src/handlers/labeled.ts — validate trigger, extract issue
   → git.cloneIfMissing() — clone repo if first time, else fetch
   → config.loadConfig() — read .doobee.json from repo
   → queue.enqueue() — global single-job queue
@@ -26,7 +26,7 @@ issues.assigned webhook OR issues.labeled webhook (doobee:solve)
       4. Run commands.setup + commands.start (Bun.spawn)
       5. For each issue in group:
          - claude.runClaude(buildSolvePrompt(), buildSystemPrompt())
-         - Check result: solved → track / stuck → label + unassign + break
+         - Check result: solved → track / stuck → label + break
       6. If commits exist: git.push() → github.createPr()
       7. Run commands.stop
       8. git.removeWorktree() (in finally block — always runs)
@@ -34,13 +34,13 @@ issues.assigned webhook OR issues.labeled webhook (doobee:solve)
 
 **Revise** (review feedback → push fixes):
 ```
-pull_request_review.submitted webhook (state: changes_requested, PR by bot)
-  → src/handlers/review.ts — validate review state + PR author
+pull_request.labeled webhook (doobee:revise) OR pull_request_review.submitted webhook (changes_requested on bot PR)
+  → src/handlers/pr-labeled.ts or src/handlers/review.ts — validate trigger
   → clone/fetch → config → enqueue
   → src/revise.ts:
       1. git.fetch()
       2. git.createWorktree() — checkout existing PR branch
-      3. github.fetchReviews() — review-level + inline comments with diff hunks
+      3. github.fetchReviews() or fetchAllReviews() — review-level + inline comments with diff hunks
       4. Run commands.setup + commands.start
       5. claude.runClaude(buildRevisionPrompt(), buildSystemPrompt())
       6. If solved + new commits: git.push() to PR branch
@@ -51,8 +51,8 @@ pull_request_review.submitted webhook (state: changes_requested, PR by bot)
 
 **Review** (PR review → inline comments):
 ```
-pull_request.review_requested webhook (requested_reviewer is bot)
-  → src/handlers/review-requested.ts — validate requested_reviewer is bot
+pull_request.labeled webhook (doobee:review)
+  → src/handlers/pr-labeled.ts — validate label
   → clone/fetch → config → enqueue
   → src/review-pr.ts:
       1. git.fetch()
@@ -64,31 +64,31 @@ pull_request.review_requested webhook (requested_reviewer is bot)
       7. git.removeWorktree() (in finally block)
 ```
 
-**Comment command** (comment → solve or review):
+**Comment command** (comment → solve, review, or revise):
 ```
 issue_comment.created webhook
   → src/handlers/comment.ts — skip bot's own comments, skip closed issues
   → src/parse-command.ts — parse @doobeebot mention, extract command + extra context
-  → Validate: solve only on issues, review only on PRs
+  → Validate: solve only on issues, review/revise only on PRs
   → clone/fetch → config → enqueue
   → solve command: enqueue solve (same as handleLabeled, with extraContext)
   → review command: github.fetchPr() → enqueue reviewPr (with extraContext)
+  → revise command: github.fetchPr() → enqueue revise (with extraContext)
 ```
 
 **Install** (app installed on repo):
 ```
 installation.created / installation_repositories.added webhook
-  → src/handlers/install.ts — create doobee:stuck, doobee:solve, and doobee:in-progress labels on each repo
+  → src/handlers/install.ts — create doobee:stuck, doobee:solve, doobee:in-progress, doobee:review, and doobee:revise labels on each repo
 ```
 
 ### Webhook events
 
-The server listens for exactly seven events:
-- `issues.assigned` — triggers solve (when assignee is bot)
+The server listens for exactly six events:
 - `issues.labeled` — triggers solve (when label is `doobee:solve`)
-- `issue_comment.created` — triggers solve or review (when comment mentions bot with a command)
-- `pull_request_review.submitted` — triggers revise (only if "changes requested" on a bot PR)
-- `pull_request.review_requested` — triggers review (only if requested reviewer is bot)
+- `pull_request.labeled` — triggers review (`doobee:review`) or revise (`doobee:revise`)
+- `issue_comment.created` — triggers solve, review, or revise (when comment mentions bot with a command)
+- `pull_request_review.submitted` — triggers revise (auto, only if "changes requested" on a bot PR)
 - `installation.created` — creates labels
 - `installation_repositories.added` — creates labels
 
@@ -113,11 +113,10 @@ Every solve/revise creates a git worktree for isolation. Worktrees live at `<rep
 - `src/commands.ts` — Shared `runCommands` helper for lifecycle commands.
 - `src/review-pr.ts` — PR review flow: worktree → diff → Claude → inline comments.
 - `src/parse-command.ts` — Parse `@doobeebot` comment commands. Pure function.
-- `src/handlers/assigned.ts` — Handle `issues.assigned` webhook.
 - `src/handlers/labeled.ts` — Handle `issues.labeled` webhook (doobee:solve label).
+- `src/handlers/pr-labeled.ts` — Handle `pull_request.labeled` webhook (doobee:review and doobee:revise labels).
 - `src/handlers/comment.ts` — Handle `issue_comment.created` webhook (comment commands).
-- `src/handlers/review.ts` — Handle `pull_request_review.submitted` webhook.
-- `src/handlers/review-requested.ts` — Handle `pull_request.review_requested` webhook.
+- `src/handlers/review.ts` — Handle `pull_request_review.submitted` webhook (auto-revise).
 - `src/handlers/install.ts` — Handle `installation.created` and `installation_repositories.added` webhooks.
 - `src/types.ts` — Shared domain types: `Issue`, `SubIssueGroup`, `ReviewComment`, `PullRequest`, `InlineComment`, `DoobeeConfig`, `Result<T>`.
 - `schema.json` — JSON Schema for `.doobee.json` config files.
@@ -180,12 +179,12 @@ If `.doobee.json` is missing, defaults are used. If it exists but is invalid JSO
 ### GitHub App
 
 - Bot identity: `doobeebot[bot]` (configurable via `BOT_NAME` env var).
-- Solve triggers: user assigns issue to the bot, adds the `doobee:solve` label, or comments `@doobeebot solve` on an issue.
-- Review trigger: user adds bot as a reviewer on a PR, or comments `@doobeebot review` on a PR.
-- Revision trigger: reviewer submits "Request changes" on a bot PR.
-- Comment commands: `@doobeebot solve [context]` on issues, `@doobeebot review [context]` on PRs. Bare `@doobeebot` defaults to solve on issues, review on PRs. Text after the command becomes extra context in Claude's prompt.
-- Labels: `doobee:stuck` (added when Claude can't resolve), `doobee:solve` (trigger to start solving), `doobee:in-progress` (added while working, removed when done).
-- On stuck: bot unassigns itself, comments with reason, adds `doobee:stuck`.
+- Solve trigger: add the `doobee:solve` label to an issue, or comment `@doobeebot solve` on an issue.
+- Review trigger: add the `doobee:review` label to a PR, or comment `@doobeebot review` on a PR.
+- Revise triggers: add the `doobee:revise` label to a PR, comment `@doobeebot revise` on a PR, or submit "Request changes" review on a bot PR (auto-triggers revise).
+- Comment commands: `@doobeebot solve [context]` on issues, `@doobeebot review [context]` or `@doobeebot revise [context]` on PRs. Bare `@doobeebot` defaults to solve on issues, review on PRs. Text after the command becomes extra context in Claude's prompt.
+- Labels: `doobee:solve` (trigger solve on issues), `doobee:review` (trigger review on PRs), `doobee:revise` (trigger revise on PRs), `doobee:stuck` (added when Claude can't resolve), `doobee:in-progress` (added while working, removed when done). Trigger labels are removed when the job starts, so re-adding re-triggers the action.
+- On stuck: bot comments with reason, adds `doobee:stuck`.
 
 ### Claude Invocation
 
@@ -201,7 +200,7 @@ claude -p --dangerously-skip-permissions --append-system-prompt "<system>" [--mo
 
 **Solve prompt** includes: issue number/title/body, promptContext if set, extraContext from comment commands if set (under "## User Instructions"), instructions to implement + test + run fix/verify commands + commit. Markers for stuck/complete.
 
-**Revision prompt** includes: PR number/title/body, all review comments (author, body, file:line, diff hunk), same fix/verify/context instructions.
+**Revision prompt** includes: PR number/title/body, all review comments (author, body, file:line, diff hunk), extraContext from comment commands if set (under "## User Instructions"), same fix/verify/context instructions. When triggered by label (`doobee:revise`), collects ALL reviews with changes_requested state. When triggered by a specific review webhook, fetches only that review's comments.
 
 **Review prompt** includes: PR number/title/body, full diff in fenced block, promptContext, extraContext from comment commands if set (under "## User Instructions"). Tells Claude to output `[DOOBEE:REVIEW]...[DOOBEE:REVIEW_END]` markers with JSON inline comments, or `[DOOBEE:COMPLETE]` if clean.
 

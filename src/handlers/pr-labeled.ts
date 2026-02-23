@@ -5,23 +5,22 @@ import { cloneIfMissing } from "../git"
 import type { GitHub } from "../github"
 import type { JobQueue } from "../queue"
 import { reviewPr } from "../review-pr"
+import { revise } from "../revise"
 import type { PullRequest } from "../types"
 
-export async function handleReviewRequested(
-  event: EmitterWebhookEvent<"pull_request.review_requested">,
+export async function handlePrLabeled(
+  event: EmitterWebhookEvent<"pull_request.labeled">,
   github: GitHub,
   queue: JobQueue,
   reposDir: string,
-  botName: string,
 ): Promise<void> {
   const { payload } = event
-
-  if (!("requested_reviewer" in payload) || !payload.requested_reviewer) return
-  if (payload.requested_reviewer.login !== botName) return
+  const labelName = payload.label?.name
+  if (labelName !== "doobee:review" && labelName !== "doobee:revise") return
 
   const installationId = payload.installation?.id
   if (!installationId) {
-    console.error("[review-requested] No installation ID in payload")
+    console.error("[pr-labeled] No installation ID in payload")
     return
   }
 
@@ -41,22 +40,38 @@ export async function handleReviewRequested(
 
   const baseBranch = payload.pull_request.base.ref
 
-  console.log(`[review-requested] Review requested on PR #${pr.number} in ${owner}/${repo}`)
-
   const token = await github.token(installationId)
   await cloneIfMissing(repoUrl, repoDir, token)
   const config = await loadConfig(repoDir)
 
-  queue.enqueue({
-    id: `review-pr-${owner}/${repo}#${pr.number}`,
-    run: () =>
-      reviewPr({
-        pr,
-        baseBranch,
-        installationId,
-        github,
-        config,
-        repoDir,
-      }),
-  })
+  if (labelName === "doobee:review") {
+    console.log(`[pr-labeled] Review triggered on PR #${pr.number} in ${owner}/${repo}`)
+
+    queue.enqueue({
+      id: `review-pr-${owner}/${repo}#${pr.number}`,
+      run: () =>
+        reviewPr({
+          pr,
+          baseBranch,
+          installationId,
+          github,
+          config,
+          repoDir,
+        }),
+    })
+  } else {
+    console.log(`[pr-labeled] Revise triggered on PR #${pr.number} in ${owner}/${repo}`)
+
+    queue.enqueue({
+      id: `revise-${owner}/${repo}#${pr.number}`,
+      run: () =>
+        revise({
+          pr,
+          installationId,
+          github,
+          config,
+          repoDir,
+        }),
+    })
+  }
 }
