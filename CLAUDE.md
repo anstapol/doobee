@@ -51,8 +51,8 @@ pull_request.labeled webhook (doobee:revise) OR pull_request_review.submitted we
 
 **Review** (PR review → inline comments):
 ```
-pull_request.labeled webhook (doobee:review)
-  → src/handlers/pr-labeled.ts — validate label
+pull_request.labeled webhook (doobee:review) OR pull_request.review_requested webhook (requested_reviewer is bot)
+  → src/handlers/pr-labeled.ts or src/handlers/review-requested.ts — validate trigger
   → clone/fetch → config → enqueue
   → src/review-pr.ts:
       1. git.fetch()
@@ -84,9 +84,10 @@ installation.created / installation_repositories.added webhook
 
 ### Webhook events
 
-The server listens for exactly six events:
+The server listens for exactly seven events:
 - `issues.labeled` — triggers solve (when label is `doobee:solve`)
 - `pull_request.labeled` — triggers review (`doobee:review`) or revise (`doobee:revise`)
+- `pull_request.review_requested` — triggers review (when requested reviewer is bot)
 - `issue_comment.created` — triggers solve, review, or revise (when comment mentions bot with a command)
 - `pull_request_review.submitted` — triggers revise (auto, only if "changes requested" on a bot PR)
 - `installation.created` — creates labels
@@ -115,6 +116,7 @@ Every solve/revise creates a git worktree for isolation. Worktrees live at `<rep
 - `src/parse-command.ts` — Parse `@doobeebot` comment commands. Pure function.
 - `src/handlers/labeled.ts` — Handle `issues.labeled` webhook (doobee:solve label).
 - `src/handlers/pr-labeled.ts` — Handle `pull_request.labeled` webhook (doobee:review and doobee:revise labels).
+- `src/handlers/review-requested.ts` — Handle `pull_request.review_requested` webhook (review when bot added as reviewer).
 - `src/handlers/comment.ts` — Handle `issue_comment.created` webhook (comment commands).
 - `src/handlers/review.ts` — Handle `pull_request_review.submitted` webhook (auto-revise).
 - `src/handlers/install.ts` — Handle `installation.created` and `installation_repositories.added` webhooks.
@@ -180,7 +182,7 @@ If `.doobee.json` is missing, defaults are used. If it exists but is invalid JSO
 
 - Bot identity: `doobeebot[bot]` (configurable via `BOT_NAME` env var).
 - Solve trigger: add the `doobee:solve` label to an issue, or comment `@doobeebot solve` on an issue.
-- Review trigger: add the `doobee:review` label to a PR, or comment `@doobeebot review` on a PR.
+- Review triggers: add the `doobee:review` label to a PR, add bot as a reviewer on a PR, or comment `@doobeebot review` on a PR.
 - Revise triggers: add the `doobee:revise` label to a PR, comment `@doobeebot revise` on a PR, or submit "Request changes" review on a bot PR (auto-triggers revise).
 - Comment commands: `@doobeebot solve [context]` on issues, `@doobeebot review [context]` or `@doobeebot revise [context]` on PRs. Bare `@doobeebot` defaults to solve on issues, review on PRs. Text after the command becomes extra context in Claude's prompt.
 - Labels: `doobee:solve` (trigger solve on issues), `doobee:review` (trigger review on PRs), `doobee:revise` (trigger revise on PRs), `doobee:stuck` (added when Claude can't resolve), `doobee:in-progress` (added while working, removed when done). Trigger labels are removed when the job starts, so re-adding re-triggers the action.

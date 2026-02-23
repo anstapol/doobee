@@ -5,6 +5,7 @@ import { handleInstall } from "./handlers/install"
 import { handleLabeled } from "./handlers/labeled"
 import { handlePrLabeled } from "./handlers/pr-labeled"
 import { handleReview } from "./handlers/review"
+import { handleReviewRequested } from "./handlers/review-requested"
 import { createQueue } from "./queue"
 
 const appId = process.env.APP_ID
@@ -39,6 +40,10 @@ webhooks.on("issue_comment.created", async (event) => {
 
 webhooks.on("pull_request_review.submitted", async (event) => {
   await handleReview(event, github, queue, reposDir, botName)
+})
+
+webhooks.on("pull_request.review_requested", async (event) => {
+  await handleReviewRequested(event, github, queue, reposDir, botName)
 })
 
 webhooks.on("installation.created", async (event) => {
