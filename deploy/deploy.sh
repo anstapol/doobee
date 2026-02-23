@@ -16,5 +16,5 @@ fi
 
 sudo -u "$DOOBEE_USER" bash -c "cd $DOOBEE_DIR && export PATH=\"\$HOME/.bun/bin:\$PATH\" && bun install"
 systemctl restart doobee
-echo "Deployed. Tailing logs (ctrl-c to stop):"
-journalctl -u doobee -f --no-pager
+echo "Deployed. Status:"
+systemctl status doobee --no-pager
