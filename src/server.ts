@@ -130,3 +130,6 @@ Bun.serve({
 })
 
 console.log(`Doobee server listening on port ${port}`)
+console.log(
+  `Trusted accounts: ${allowedAccounts.size > 0 ? [...allowedAccounts].join(", ") : "(none)"}`,
+)
