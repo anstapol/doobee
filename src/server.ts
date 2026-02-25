@@ -15,6 +15,22 @@ const reposDir = resolve(process.env.REPOS_DIR ?? "./repos")
 const port = parseInt(process.env.PORT ?? "3000", 10)
 const botName = process.env.BOT_NAME ?? "doobeebot[bot]"
 
+const allowedAccounts = new Set(
+  (process.env.ALLOWED_ACCOUNTS ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean),
+)
+
+function extractAccount(body: string): string | undefined {
+  try {
+    const json = JSON.parse(body)
+    return (json.repository?.owner?.login ?? json.installation?.account?.login)?.toLowerCase()
+  } catch {
+    return undefined
+  }
+}
+
 if (!appId || !privateKeyPath || !webhookSecret) {
   console.error("Missing required env vars: APP_ID, PRIVATE_KEY_PATH, WEBHOOK_SECRET")
   process.exit(1)
@@ -76,6 +92,16 @@ Bun.serve({
       const name = req.headers.get("x-github-event") ?? ""
       const signature = req.headers.get("x-hub-signature-256") ?? ""
       const payload = await req.text()
+
+      if (allowedAccounts.size === 0) {
+        console.warn("[webhook] ALLOWED_ACCOUNTS is empty, skipping all webhooks")
+        return new Response("ok", { status: 200 })
+      }
+
+      const account = extractAccount(payload)
+      if (!account || !allowedAccounts.has(account)) {
+        return new Response("ok", { status: 200 })
+      }
 
       try {
         await webhooks.verifyAndReceive({ id, name, payload, signature })

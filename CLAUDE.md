@@ -196,6 +196,7 @@ If `.doobee.json` is missing, defaults are used. If it exists but is invalid JSO
 
 ### GitHub App
 
+- Account allowlist: `ALLOWED_ACCOUNTS` env var (comma-separated GitHub usernames/orgs). Webhooks from unlisted accounts are silently dropped. If unset or empty, all webhooks are skipped.
 - Bot identity: `doobeebot[bot]` (configurable via `BOT_NAME` env var).
 - Solve trigger: add the `doobee:solve` label to an issue, or comment `@doobeebot solve` on an issue.
 - Review triggers: add the `doobee:review` label to a PR, add bot as a reviewer on a PR, or comment `@doobeebot review` on a PR.
