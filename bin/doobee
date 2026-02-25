@@ -3,6 +3,7 @@ set -euo pipefail
 
 CONFIG_FILE="$HOME/.config/doobee"
 SERVICE_NAME="doobee"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 # --- Config helpers ---
 
@@ -25,32 +26,28 @@ require_host() {
 
 cmd_deploy() {
   require_host
-  local root
-  root=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "Error: not a git repository" >&2; exit 1; }
 
-  if [[ ! -f "$root/deploy/deploy.sh" ]]; then
+  if [[ ! -f "$REPO_ROOT/deploy/deploy.sh" ]]; then
     echo "Error: deploy/deploy.sh not found in repo root" >&2
     exit 1
   fi
 
   echo "Deploying to $VPS..."
-  git -C "$root" archive --format=tar HEAD | ssh "$VPS" 'mkdir -p /tmp/doobee && tar -xf - -C /tmp/doobee'
+  git -C "$REPO_ROOT" archive --format=tar HEAD | ssh "$VPS" 'mkdir -p /tmp/doobee && tar -xf - -C /tmp/doobee'
   ssh -t "$VPS" 'sudo bash /tmp/doobee/deploy/deploy.sh'
   echo "Done."
 }
 
 cmd_install() {
   require_host
-  local root
-  root=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "Error: not a git repository" >&2; exit 1; }
 
-  if [[ ! -f "$root/deploy/install.sh" ]]; then
+  if [[ ! -f "$REPO_ROOT/deploy/install.sh" ]]; then
     echo "Error: deploy/install.sh not found in repo root" >&2
     exit 1
   fi
 
   echo "Installing on $VPS..."
-  git -C "$root" archive --format=tar HEAD | ssh "$VPS" 'mkdir -p /tmp/doobee && tar -xf - -C /tmp/doobee'
+  git -C "$REPO_ROOT" archive --format=tar HEAD | ssh "$VPS" 'mkdir -p /tmp/doobee && tar -xf - -C /tmp/doobee'
   ssh -t "$VPS" 'sudo bash /tmp/doobee/deploy/install.sh'
   echo "Done."
 }
