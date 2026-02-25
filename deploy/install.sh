@@ -27,6 +27,14 @@ echo "==> Installing system packages"
 apt-get update -qq
 apt-get install -y -qq git curl unzip
 
+echo "==> Installing Docker"
+if command -v docker &>/dev/null; then
+  echo "    Already installed: $(docker --version)"
+else
+  curl -fsSL https://get.docker.com | sh
+fi
+usermod -aG docker "$DOOBEE_USER"
+
 echo "==> Installing Bun"
 sudo -u "$DOOBEE_USER" bash -c 'curl -fsSL https://bun.sh/install | bash'
 
