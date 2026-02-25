@@ -89,101 +89,13 @@ cmd_ssh() {
   ssh "$VPS_HOST"
 }
 
-cmd_trust() {
-  require_host
-  local env_file="/home/doobee/doobee/.env"
-  local subcmd="${1:-}"
-
-  # Read current value from remote (no sudo needed for reading)
-  _trust_read_current() {
-    ssh "$VPS_HOST" "grep '^ALLOWED_ACCOUNTS=' '$env_file' 2>/dev/null | cut -d= -f2-" || echo ""
-  }
-
-  # Write new value and restart service (needs sudo + TTY)
-  _trust_write() {
-    local result="$1"
-    if ssh "$VPS_HOST" "grep -q '^ALLOWED_ACCOUNTS=' '$env_file' 2>/dev/null"; then
-      ssh -t "$VPS_HOST" "sudo sed -i 's|^ALLOWED_ACCOUNTS=.*|ALLOWED_ACCOUNTS=$result|' '$env_file' && sudo systemctl restart doobee"
-    else
-      ssh -t "$VPS_HOST" "echo 'ALLOWED_ACCOUNTS=$result' | sudo tee -a '$env_file' > /dev/null && sudo systemctl restart doobee"
-    fi
-    echo "Updated: $result"
-  }
-
-  if [[ -z "$subcmd" ]]; then
-    local current
-    current=$(_trust_read_current)
-    if [[ -z "$current" ]]; then
-      echo "(not set)"
-    else
-      echo "$current" | tr ',' '\n'
-    fi
-    return
-  fi
-
-  shift
-  if [[ $# -eq 0 ]]; then
-    echo "Usage: doobee trust add|remove <account> [account...]" >&2
-    exit 1
-  fi
-
-  local accounts=("$@")
-  local current
-  current=$(_trust_read_current)
-
-  IFS=',' read -ra existing <<< "$current"
-
-  case "$subcmd" in
-    add)
-      echo "Adding: ${accounts[*]}"
-      for acct in "${accounts[@]}"; do
-        local found=false
-        for e in "${existing[@]}"; do
-          if [[ "$e" == "$acct" ]]; then found=true; break; fi
-        done
-        if [[ "$found" == false ]]; then
-          existing+=("$acct")
-        fi
-      done
-      ;;
-    remove)
-      echo "Removing: ${accounts[*]}"
-      local filtered=()
-      for e in "${existing[@]}"; do
-        [[ -z "$e" ]] && continue
-        local skip=false
-        for r in "${accounts[@]}"; do
-          if [[ "$e" == "$r" ]]; then skip=true; break; fi
-        done
-        if [[ "$skip" == false ]]; then
-          filtered+=("$e")
-        fi
-      done
-      existing=("${filtered[@]}")
-      ;;
-    *)
-      echo "Unknown subcommand: $subcmd" >&2
-      echo "Usage: doobee trust add|remove <account> [account...]" >&2
-      exit 1
-      ;;
-  esac
-
-  # Join entries
-  local result=""
-  for e in "${existing[@]}"; do
-    [[ -z "$e" ]] && continue
-    if [[ -n "$result" ]]; then result="$result,$e"; else result="$e"; fi
-  done
-
-  _trust_write "$result"
-}
 
 cmd_restart() {
   require_host
   echo "Restarting $SERVICE_NAME on $VPS_HOST..."
   ssh -t "$VPS_HOST" "sudo systemctl restart $SERVICE_NAME"
   echo "Restarted. Fetching recent logs..."
-  ssh "$VPS_HOST" "sudo journalctl -u $SERVICE_NAME -n 5 --no-pager"
+  ssh -t "$VPS_HOST" "sudo journalctl -u $SERVICE_NAME -n 5 --no-pager"
 }
 
 cmd_config() {
@@ -219,10 +131,6 @@ Commands:
     -n <N>       Show last N lines without following
   status       Show service status
   ssh          Open SSH session to VPS
-  trust        Manage trusted GitHub accounts (ALLOWED_ACCOUNTS)
-    (no args)    List current trusted accounts
-    add <acct>   Add accounts and restart service
-    remove <acct> Remove accounts and restart service
   config       Set config values
     vps_host     SSH target (e.g. root@1.2.3.4)
 
@@ -242,7 +150,6 @@ case "${1:-}" in
   logs)    shift; cmd_logs "$@" ;;
   status)  shift; cmd_status "$@" ;;
   ssh)     shift; cmd_ssh "$@" ;;
-  trust)   shift; cmd_trust "$@" ;;
   config)  shift; cmd_config "$@" ;;
   *)       usage ;;
 esac
