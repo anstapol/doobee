@@ -35,7 +35,7 @@ cmd_deploy() {
 
   echo "Deploying to $VPS_HOST..."
   git -C "$root" archive --format=tar HEAD | ssh "$VPS_HOST" 'mkdir -p /tmp/doobee && tar -xf - -C /tmp/doobee'
-  ssh "$VPS_HOST" 'sudo bash /tmp/doobee/deploy/deploy.sh'
+  ssh -t "$VPS_HOST" 'sudo bash /tmp/doobee/deploy/deploy.sh'
   echo "Done."
 }
 
@@ -51,7 +51,7 @@ cmd_install() {
 
   echo "Installing on $VPS_HOST..."
   git -C "$root" archive --format=tar HEAD | ssh "$VPS_HOST" 'mkdir -p /tmp/doobee && tar -xf - -C /tmp/doobee'
-  ssh "$VPS_HOST" 'sudo bash /tmp/doobee/deploy/install.sh'
+  ssh -t "$VPS_HOST" 'sudo bash /tmp/doobee/deploy/install.sh'
   echo "Done."
 }
 
