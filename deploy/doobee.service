@@ -13,6 +13,7 @@ RestartSec=5
 
 # Bun auto-loads .env from WorkingDirectory
 # claude CLI lives in ~/.bun/bin — must be on PATH for Bun.spawn
+Environment=HOME=/home/doobee
 Environment=PATH=/home/doobee/.bun/bin:/home/doobee/.local/share/pnpm:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 [Install]
