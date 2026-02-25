@@ -126,8 +126,40 @@ export async function revise(ctx: ReviseContext): Promise<void> {
         })
 
     // 4. Run setup and start commands
-    await runCommands(config.commands.setup, wtPath, mergedEnv)
-    await runCommands(config.commands.start, wtPath, mergedEnv)
+    const setupResult = await runCommands(config.commands.setup, wtPath, mergedEnv)
+    if (!setupResult.ok) {
+      console.error(`[revise] Setup failed: ${setupResult.error}`)
+      await addLabel(octokit, {
+        owner: pr.repoOwner,
+        repo: pr.repoName,
+        issueNumber: pr.number,
+        label: "doobee:stuck",
+      })
+      await postComment(octokit, {
+        owner: pr.repoOwner,
+        repo: pr.repoName,
+        issueNumber: pr.number,
+        body: `Setup command failed: ${setupResult.error}`,
+      })
+      return
+    }
+    const startResult = await runCommands(config.commands.start, wtPath, mergedEnv)
+    if (!startResult.ok) {
+      console.error(`[revise] Start failed: ${startResult.error}`)
+      await addLabel(octokit, {
+        owner: pr.repoOwner,
+        repo: pr.repoName,
+        issueNumber: pr.number,
+        label: "doobee:stuck",
+      })
+      await postComment(octokit, {
+        owner: pr.repoOwner,
+        repo: pr.repoName,
+        issueNumber: pr.number,
+        body: `Start command failed: ${startResult.error}`,
+      })
+      return
+    }
     started = true
 
     // 5. Build prompts and run Claude
