@@ -14,9 +14,9 @@ load_config() {
 }
 
 require_host() {
-  if [[ -z "${VPS_HOST:-}" ]]; then
-    echo "Error: VPS_HOST not configured." >&2
-    echo "Run: doobee config vps_host root@your-server" >&2
+  if [[ -z "${VPS:-}" ]]; then
+    echo "Error: VPS not configured." >&2
+    echo "Run: doobee config vps root@your-server" >&2
     exit 1
   fi
 }
@@ -33,9 +33,9 @@ cmd_deploy() {
     exit 1
   fi
 
-  echo "Deploying to $VPS_HOST..."
-  git -C "$root" archive --format=tar HEAD | ssh "$VPS_HOST" 'mkdir -p /tmp/doobee && tar -xf - -C /tmp/doobee'
-  ssh -t "$VPS_HOST" 'sudo bash /tmp/doobee/deploy/deploy.sh'
+  echo "Deploying to $VPS..."
+  git -C "$root" archive --format=tar HEAD | ssh "$VPS" 'mkdir -p /tmp/doobee && tar -xf - -C /tmp/doobee'
+  ssh -t "$VPS" 'sudo bash /tmp/doobee/deploy/deploy.sh'
   echo "Done."
 }
 
@@ -49,9 +49,9 @@ cmd_install() {
     exit 1
   fi
 
-  echo "Installing on $VPS_HOST..."
-  git -C "$root" archive --format=tar HEAD | ssh "$VPS_HOST" 'mkdir -p /tmp/doobee && tar -xf - -C /tmp/doobee'
-  ssh -t "$VPS_HOST" 'sudo bash /tmp/doobee/deploy/install.sh'
+  echo "Installing on $VPS..."
+  git -C "$root" archive --format=tar HEAD | ssh "$VPS" 'mkdir -p /tmp/doobee && tar -xf - -C /tmp/doobee'
+  ssh -t "$VPS" 'sudo bash /tmp/doobee/deploy/install.sh'
   echo "Done."
 }
 
@@ -62,7 +62,7 @@ cmd_logs() {
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      -n) lines="$2"; shift 2 ;;
+      -n) [[ -z "${2:-}" ]] && { echo "Error: -n requires a number" >&2; exit 1; }; lines="$2"; shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
   done
@@ -76,26 +76,25 @@ cmd_logs() {
     args+=(-f)
   fi
 
-  ssh -t "$VPS_HOST" "sudo journalctl -u $SERVICE_NAME ${args[*]}"
+  ssh -t "$VPS" "sudo journalctl -u $SERVICE_NAME ${args[*]}"
 }
 
 cmd_status() {
   require_host
-  ssh "$VPS_HOST" "systemctl status $SERVICE_NAME" || true
+  ssh "$VPS" "systemctl status $SERVICE_NAME" || true
 }
 
 cmd_ssh() {
   require_host
-  ssh "$VPS_HOST"
+  ssh "$VPS"
 }
-
 
 cmd_restart() {
   require_host
-  echo "Restarting $SERVICE_NAME on $VPS_HOST..."
-  ssh -t "$VPS_HOST" "sudo systemctl restart $SERVICE_NAME"
+  echo "Restarting $SERVICE_NAME on $VPS..."
+  ssh -t "$VPS" "sudo systemctl restart $SERVICE_NAME"
   echo "Restarted. Fetching recent logs..."
-  ssh -t "$VPS_HOST" "sudo journalctl -u $SERVICE_NAME -n 5 --no-pager"
+  ssh -t "$VPS" "sudo journalctl -u $SERVICE_NAME -n 5 --no-pager"
 }
 
 cmd_config() {
@@ -119,23 +118,39 @@ cmd_config() {
   echo "Set $key=$value"
 }
 
+cmd_vps() {
+  local subcmd="${1:-}"
+  shift 2>/dev/null || true
+
+  case "$subcmd" in
+    deploy)  cmd_deploy "$@" ;;
+    install) cmd_install "$@" ;;
+    restart) cmd_restart "$@" ;;
+    logs)    cmd_logs "$@" ;;
+    status)  cmd_status "$@" ;;
+    ssh)     cmd_ssh "$@" ;;
+    *)       echo "Usage: doobee vps <deploy|install|restart|logs|status|ssh>" >&2; exit 1 ;;
+  esac
+}
+
 usage() {
   cat <<'EOF'
 Usage: doobee <command> [options]
 
 Commands:
-  deploy       Push code to VPS and restart service
-  install      First-time VPS setup
-  restart      Restart the service on VPS
-  logs         Tail service logs (follows by default)
-    -n <N>       Show last N lines without following
-  status       Show service status
-  ssh          Open SSH session to VPS
-  config       Set config values
-    vps_host     SSH target (e.g. root@1.2.3.4)
+  vps <cmd>    Manage VPS
+    deploy       Push code and restart service
+    install      First-time setup
+    restart      Restart the service
+    logs         Tail service logs (follows by default)
+      -n <N>       Show last N lines without following
+    status       Show service status
+    ssh          Open SSH session
+  config       Set local config values
+    vps          SSH target (e.g. root@1.2.3.4)
 
 Setup:
-  doobee config vps_host root@your-server
+  doobee config vps root@your-server
 EOF
 }
 
@@ -144,12 +159,7 @@ EOF
 load_config
 
 case "${1:-}" in
-  deploy)  shift; cmd_deploy "$@" ;;
-  install) shift; cmd_install "$@" ;;
-  restart) shift; cmd_restart "$@" ;;
-  logs)    shift; cmd_logs "$@" ;;
-  status)  shift; cmd_status "$@" ;;
-  ssh)     shift; cmd_ssh "$@" ;;
+  vps)     shift; cmd_vps "$@" ;;
   config)  shift; cmd_config "$@" ;;
   *)       usage ;;
 esac
