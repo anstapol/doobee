@@ -89,6 +89,128 @@ cmd_ssh() {
   ssh "$VPS_HOST"
 }
 
+cmd_trust() {
+  require_host
+  local env_file="/home/doobee/doobee/.env"
+  local subcmd="${1:-}"
+
+  if [[ -z "$subcmd" ]]; then
+    # List current trusted accounts
+    ssh "$VPS_HOST" "bash -s" <<'REMOTE'
+      set -euo pipefail
+      ENV_FILE="/home/doobee/doobee/.env"
+      if [[ -f "$ENV_FILE" ]] && grep -q '^ALLOWED_ACCOUNTS=' "$ENV_FILE"; then
+        value=$(grep '^ALLOWED_ACCOUNTS=' "$ENV_FILE" | cut -d= -f2-)
+        if [[ -n "$value" ]]; then
+          echo "$value" | tr ',' '\n'
+        else
+          echo "(empty)"
+        fi
+      else
+        echo "(not set)"
+      fi
+REMOTE
+    return
+  fi
+
+  shift
+  if [[ $# -eq 0 ]]; then
+    echo "Usage: doobee trust add|remove <account> [account...]" >&2
+    exit 1
+  fi
+
+  local accounts=("$@")
+
+  case "$subcmd" in
+    add)
+      echo "Adding: ${accounts[*]}"
+      ssh "$VPS_HOST" "bash -s" <<REMOTE
+        set -euo pipefail
+        ENV_FILE="$env_file"
+        current=""
+        if [[ -f "\$ENV_FILE" ]] && grep -q '^ALLOWED_ACCOUNTS=' "\$ENV_FILE"; then
+          current=\$(grep '^ALLOWED_ACCOUNTS=' "\$ENV_FILE" | cut -d= -f2-)
+        fi
+        IFS=',' read -ra existing <<< "\$current"
+        new_accounts=(${accounts[*]})
+        for acct in "\${new_accounts[@]}"; do
+          found=false
+          for e in "\${existing[@]}"; do
+            if [[ "\$e" == "\$acct" ]]; then
+              found=true
+              break
+            fi
+          done
+          if [[ "\$found" == false ]]; then
+            existing+=("\$acct")
+          fi
+        done
+        # Filter empty entries and join
+        result=""
+        for e in "\${existing[@]}"; do
+          if [[ -n "\$e" ]]; then
+            if [[ -n "\$result" ]]; then
+              result="\$result,\$e"
+            else
+              result="\$e"
+            fi
+          fi
+        done
+        if grep -q '^ALLOWED_ACCOUNTS=' "\$ENV_FILE" 2>/dev/null; then
+          sed -i "s|^ALLOWED_ACCOUNTS=.*|ALLOWED_ACCOUNTS=\$result|" "\$ENV_FILE"
+        else
+          echo "ALLOWED_ACCOUNTS=\$result" >> "\$ENV_FILE"
+        fi
+        sudo systemctl restart doobee
+        echo "Updated: \$result"
+REMOTE
+      ;;
+    remove)
+      echo "Removing: ${accounts[*]}"
+      ssh "$VPS_HOST" "bash -s" <<REMOTE
+        set -euo pipefail
+        ENV_FILE="$env_file"
+        current=""
+        if [[ -f "\$ENV_FILE" ]] && grep -q '^ALLOWED_ACCOUNTS=' "\$ENV_FILE"; then
+          current=\$(grep '^ALLOWED_ACCOUNTS=' "\$ENV_FILE" | cut -d= -f2-)
+        fi
+        IFS=',' read -ra existing <<< "\$current"
+        remove_accounts=(${accounts[*]})
+        result=""
+        for e in "\${existing[@]}"; do
+          if [[ -z "\$e" ]]; then continue; fi
+          skip=false
+          for r in "\${remove_accounts[@]}"; do
+            if [[ "\$e" == "\$r" ]]; then
+              skip=true
+              break
+            fi
+          done
+          if [[ "\$skip" == false ]]; then
+            if [[ -n "\$result" ]]; then
+              result="\$result,\$e"
+            else
+              result="\$e"
+            fi
+          fi
+        done
+        if grep -q '^ALLOWED_ACCOUNTS=' "\$ENV_FILE" 2>/dev/null; then
+          sed -i "s|^ALLOWED_ACCOUNTS=.*|ALLOWED_ACCOUNTS=\$result|" "\$ENV_FILE"
+        else
+          echo "ALLOWED_ACCOUNTS=\$result" >> "\$ENV_FILE"
+        fi
+        sudo systemctl restart doobee
+        echo "Updated: \$result"
+REMOTE
+      ;;
+    *)
+      echo "Unknown subcommand: $subcmd" >&2
+      echo "Usage: doobee trust add|remove <account> [account...]" >&2
+      exit 1
+      ;;
+  esac
+}
+
 cmd_config() {
   if [[ $# -lt 2 ]]; then
     echo "Usage: doobee config <key> <value>" >&2
@@ -121,6 +243,10 @@ Commands:
     -n <N>       Show last N lines without following
   status       Show service status
   ssh          Open SSH session to VPS
+  trust        Manage trusted GitHub accounts (ALLOWED_ACCOUNTS)
+    (no args)    List current trusted accounts
+    add <acct>   Add accounts and restart service
+    remove <acct> Remove accounts and restart service
   config       Set config values
     vps_host     SSH target (e.g. root@1.2.3.4)
 
@@ -139,6 +265,7 @@ case "${1:-}" in
   logs)    shift; cmd_logs "$@" ;;
   status)  shift; cmd_status "$@" ;;
   ssh)     shift; cmd_ssh "$@" ;;
+  trust)   shift; cmd_trust "$@" ;;
   config)  shift; cmd_config "$@" ;;
   *)       usage ;;
 esac
