@@ -94,22 +94,30 @@ cmd_trust() {
   local env_file="/home/doobee/doobee/.env"
   local subcmd="${1:-}"
 
+  # Read current value from remote (no sudo needed for reading)
+  _trust_read_current() {
+    ssh "$VPS_HOST" "grep '^ALLOWED_ACCOUNTS=' '$env_file' 2>/dev/null | cut -d= -f2-" || echo ""
+  }
+
+  # Write new value and restart service (needs sudo + TTY)
+  _trust_write() {
+    local result="$1"
+    if ssh "$VPS_HOST" "grep -q '^ALLOWED_ACCOUNTS=' '$env_file' 2>/dev/null"; then
+      ssh -t "$VPS_HOST" "sudo sed -i 's|^ALLOWED_ACCOUNTS=.*|ALLOWED_ACCOUNTS=$result|' '$env_file' && sudo systemctl restart doobee"
+    else
+      ssh -t "$VPS_HOST" "echo 'ALLOWED_ACCOUNTS=$result' | sudo tee -a '$env_file' > /dev/null && sudo systemctl restart doobee"
+    fi
+    echo "Updated: $result"
+  }
+
   if [[ -z "$subcmd" ]]; then
-    # List current trusted accounts
-    ssh "$VPS_HOST" "bash -s" <<'REMOTE'
-      set -euo pipefail
-      ENV_FILE="/home/doobee/doobee/.env"
-      if [[ -f "$ENV_FILE" ]] && grep -q '^ALLOWED_ACCOUNTS=' "$ENV_FILE"; then
-        value=$(grep '^ALLOWED_ACCOUNTS=' "$ENV_FILE" | cut -d= -f2-)
-        if [[ -n "$value" ]]; then
-          echo "$value" | tr ',' '\n'
-        else
-          echo "(empty)"
-        fi
-      else
-        echo "(not set)"
-      fi
-REMOTE
+    local current
+    current=$(_trust_read_current)
+    if [[ -z "$current" ]]; then
+      echo "(not set)"
+    else
+      echo "$current" | tr ',' '\n'
+    fi
     return
   fi
 
@@ -120,88 +128,38 @@ REMOTE
   fi
 
   local accounts=("$@")
+  local current
+  current=$(_trust_read_current)
+
+  IFS=',' read -ra existing <<< "$current"
 
   case "$subcmd" in
     add)
       echo "Adding: ${accounts[*]}"
-      ssh -t "$VPS_HOST" "bash -s" <<REMOTE
-        set -euo pipefail
-        ENV_FILE="$env_file"
-        current=""
-        if [[ -f "\$ENV_FILE" ]] && grep -q '^ALLOWED_ACCOUNTS=' "\$ENV_FILE"; then
-          current=\$(grep '^ALLOWED_ACCOUNTS=' "\$ENV_FILE" | cut -d= -f2-)
-        fi
-        IFS=',' read -ra existing <<< "\$current"
-        new_accounts=(${accounts[*]})
-        for acct in "\${new_accounts[@]}"; do
-          found=false
-          for e in "\${existing[@]}"; do
-            if [[ "\$e" == "\$acct" ]]; then
-              found=true
-              break
-            fi
-          done
-          if [[ "\$found" == false ]]; then
-            existing+=("\$acct")
-          fi
+      for acct in "${accounts[@]}"; do
+        local found=false
+        for e in "${existing[@]}"; do
+          if [[ "$e" == "$acct" ]]; then found=true; break; fi
         done
-        # Filter empty entries and join
-        result=""
-        for e in "\${existing[@]}"; do
-          if [[ -n "\$e" ]]; then
-            if [[ -n "\$result" ]]; then
-              result="\$result,\$e"
-            else
-              result="\$e"
-            fi
-          fi
-        done
-        if grep -q '^ALLOWED_ACCOUNTS=' "\$ENV_FILE" 2>/dev/null; then
-          sudo sed -i "s|^ALLOWED_ACCOUNTS=.*|ALLOWED_ACCOUNTS=\$result|" "\$ENV_FILE"
-        else
-          echo "ALLOWED_ACCOUNTS=\$result" | sudo tee -a "\$ENV_FILE" > /dev/null
+        if [[ "$found" == false ]]; then
+          existing+=("$acct")
         fi
-        sudo systemctl restart doobee
-        echo "Updated: \$result"
-REMOTE
+      done
       ;;
     remove)
       echo "Removing: ${accounts[*]}"
-      ssh -t "$VPS_HOST" "bash -s" <<REMOTE
-        set -euo pipefail
-        ENV_FILE="$env_file"
-        current=""
-        if [[ -f "\$ENV_FILE" ]] && grep -q '^ALLOWED_ACCOUNTS=' "\$ENV_FILE"; then
-          current=\$(grep '^ALLOWED_ACCOUNTS=' "\$ENV_FILE" | cut -d= -f2-)
-        fi
-        IFS=',' read -ra existing <<< "\$current"
-        remove_accounts=(${accounts[*]})
-        result=""
-        for e in "\${existing[@]}"; do
-          if [[ -z "\$e" ]]; then continue; fi
-          skip=false
-          for r in "\${remove_accounts[@]}"; do
-            if [[ "\$e" == "\$r" ]]; then
-              skip=true
-              break
-            fi
-          done
-          if [[ "\$skip" == false ]]; then
-            if [[ -n "\$result" ]]; then
-              result="\$result,\$e"
-            else
-              result="\$e"
-            fi
-          fi
+      local filtered=()
+      for e in "${existing[@]}"; do
+        [[ -z "$e" ]] && continue
+        local skip=false
+        for r in "${accounts[@]}"; do
+          if [[ "$e" == "$r" ]]; then skip=true; break; fi
         done
-        if grep -q '^ALLOWED_ACCOUNTS=' "\$ENV_FILE" 2>/dev/null; then
-          sudo sed -i "s|^ALLOWED_ACCOUNTS=.*|ALLOWED_ACCOUNTS=\$result|" "\$ENV_FILE"
-        else
-          echo "ALLOWED_ACCOUNTS=\$result" | sudo tee -a "\$ENV_FILE" > /dev/null
+        if [[ "$skip" == false ]]; then
+          filtered+=("$e")
         fi
-        sudo systemctl restart doobee
-        echo "Updated: \$result"
-REMOTE
+      done
+      existing=("${filtered[@]}")
       ;;
     *)
       echo "Unknown subcommand: $subcmd" >&2
@@ -209,6 +167,15 @@ REMOTE
       exit 1
       ;;
   esac
+
+  # Join entries
+  local result=""
+  for e in "${existing[@]}"; do
+    [[ -z "$e" ]] && continue
+    if [[ -n "$result" ]]; then result="$result,$e"; else result="$e"; fi
+  done
+
+  _trust_write "$result"
 }
 
 cmd_config() {
