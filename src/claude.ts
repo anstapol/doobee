@@ -12,6 +12,7 @@ export async function runClaude(opts: {
   model?: string
   timeout?: number
   env?: Record<string, string>
+  label?: string
 }): Promise<ClaudeResult> {
   const args = [
     "claude",
@@ -36,6 +37,12 @@ export async function runClaude(opts: {
 
   const timeoutMs = (opts.timeout ?? 3600) * 1000
   const timer = setTimeout(() => proc.kill(), timeoutMs)
+  const startTime = Date.now()
+  const heartbeat = setInterval(() => {
+    const mins = Math.round((Date.now() - startTime) / 60_000)
+    const tag = opts.label ? `[claude] ${opts.label}` : "[claude]"
+    console.log(`${tag} Still working... (${mins}m elapsed)`)
+  }, 60_000)
 
   const [stdout, stderr] = await Promise.all([
     new Response(proc.stdout).text(),
@@ -43,6 +50,7 @@ export async function runClaude(opts: {
   ])
   const exitCode = await proc.exited
   clearTimeout(timer)
+  clearInterval(heartbeat)
   const output = stdout + stderr
 
   if (output.includes("[DOOBEE:STUCK]")) {

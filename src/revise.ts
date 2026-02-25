@@ -175,6 +175,7 @@ export async function revise(ctx: ReviseContext): Promise<void> {
       model: config.model,
       timeout: config.timeout,
       env: mergedEnv,
+      label: `PR #${pr.number}`,
     })
 
     // 6. Handle result
