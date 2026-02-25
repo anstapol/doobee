@@ -23,7 +23,8 @@ issues.labeled webhook (doobee:solve)
       1. git.fetch()
       2. github.fetchParent() / fetchSubIssues() — detect sub-issue group
       3. git.createWorktree() — isolated branch from baseBranch
-      4. Run commands.setup + commands.start (Bun.spawn)
+      3b. docker.isolateDockerPorts() — remap Docker ports if compose file exists
+      4. Run commands.setup + commands.start (Bun.spawn, with Docker port env)
       5. For each issue in group:
          - claude.runClaude(buildSolvePrompt(), buildSystemPrompt())
          - Check result: solved → track / stuck → label + break
@@ -40,8 +41,9 @@ pull_request.labeled webhook (doobee:revise) OR pull_request_review.submitted we
   → src/revise.ts:
       1. git.fetch()
       2. git.createWorktree() — checkout existing PR branch
+      2b. docker.isolateDockerPorts() — remap Docker ports if compose file exists
       3. github.fetchReviews() or fetchAllReviews() — review-level + inline comments with diff hunks
-      4. Run commands.setup + commands.start
+      4. Run commands.setup + commands.start (with Docker port env)
       5. claude.runClaude(buildRevisionPrompt(), buildSystemPrompt())
       6. If solved + new commits: git.push() to PR branch
          If stuck: label doobee:stuck on PR + comment
@@ -101,6 +103,18 @@ Global single-job queue. One Claude session at a time. Not persisted — if the 
 
 Every solve/revise creates a git worktree for isolation. Worktrees live at `<repoDir>/.worktrees/doobee-<branch>`. Created before Claude runs, removed in a `finally` block after. The main checkout is never mutated.
 
+### Docker port isolation
+
+Before running commands in a worktree, `isolateDockerPorts()` checks for a compose file (`compose.yml`, `docker-compose.yml`, etc.). If found:
+
+1. Runs `docker compose config --format json` to parse all port mappings.
+2. Allocates a free host port for each published port.
+3. Writes `docker-compose.override.yml` with `!reset` tags to replace port mappings. If the repo already has a `docker-compose.override.yml`, writes to `.doobee-compose-ports.yml` and sets `COMPOSE_FILE` to chain both.
+4. Scans the raw compose file for `${VAR:-default}` patterns where the default matches a remapped port, then sets those env vars to the new ports.
+5. Port env vars are passed to all commands (setup, start, stop) and Claude's process. The system prompt includes port assignments so Claude knows which ports to use.
+
+Override file is auto-cleaned when the worktree is removed. No compose file or no ports → no-op.
+
 ## Project Structure
 
 - `src/server.ts` — HTTP server, webhook signature verification, event routing. Entry point.
@@ -111,7 +125,8 @@ Every solve/revise creates a git worktree for isolation. Worktrees live at `<rep
 - `src/git.ts` — Git worktree management, branches, push, commit detection. All via `Bun.spawn`.
 - `src/claude.ts` — Spawn Claude CLI, build prompts (solve/revise/review/system), parse output markers.
 - `src/config.ts` — Load `.doobee.json` from repos, merge with defaults. Exports `DEFAULT_CONFIG`.
-- `src/commands.ts` — Shared `runCommands` helper for lifecycle commands.
+- `src/commands.ts` — Shared `runCommands` helper for lifecycle commands. Accepts optional env vars.
+- `src/docker.ts` — Docker port isolation. Detects compose files, remaps host ports to free ports via override.
 - `src/review-pr.ts` — PR review flow: worktree → diff → Claude → inline comments.
 - `src/parse-command.ts` — Parse `@doobeebot` comment commands. Pure function.
 - `src/handlers/labeled.ts` — Handle `issues.labeled` webhook (doobee:solve label).
@@ -155,7 +170,7 @@ SOLID where it matters: single responsibility per module, depend on abstractions
 
 Runtime: `@octokit/app`, `@octokit/webhooks`. That's it. Add nothing without explicit approval.
 
-External CLIs: `git`, `claude`. Must be on PATH.
+External CLIs: `git`, `claude`, `docker` (optional, for port isolation). Must be on PATH.
 
 ### Config
 
@@ -199,6 +214,7 @@ claude -p --dangerously-skip-permissions --append-system-prompt "<system>" [--mo
 - Fully automated pipeline, never pause for confirmation.
 - Full file permissions, clean feature branch in a worktree.
 - Which setup/start commands already ran.
+- Docker port assignments (if ports were remapped).
 - Focus on the issue, smallest change possible.
 
 **Solve prompt** includes: issue number/title/body, promptContext if set, extraContext from comment commands if set (under "## User Instructions"), instructions to implement + test + run fix/verify commands + commit. Markers for stuck/complete.

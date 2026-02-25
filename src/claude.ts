@@ -11,6 +11,7 @@ export async function runClaude(opts: {
   cwd: string
   model?: string
   timeout?: number
+  env?: Record<string, string>
 }): Promise<ClaudeResult> {
   const args = [
     "claude",
@@ -30,6 +31,7 @@ export async function runClaude(opts: {
     cwd: opts.cwd,
     stdout: "pipe",
     stderr: "pipe",
+    env: opts.env ? { ...process.env, ...opts.env } : undefined,
   })
 
   const timeoutMs = (opts.timeout ?? 3600) * 1000
@@ -237,7 +239,7 @@ export function parseReviewComments(output: string): InlineComment[] {
   return comments
 }
 
-export function buildSystemPrompt(config: DoobeeConfig): string {
+export function buildSystemPrompt(config: DoobeeConfig, portEnv?: Record<string, string>): string {
   const lines: string[] = [
     "You are running in a fully automated pipeline. No human operator. Never pause for confirmation.",
     "You have full permission to create, modify, and delete files.",
@@ -249,6 +251,17 @@ export function buildSystemPrompt(config: DoobeeConfig): string {
   }
   if (config.commands.start.length > 0) {
     lines.push(`Start commands already ran: ${config.commands.start.join(", ")}`)
+  }
+
+  if (portEnv) {
+    const assignments = Object.entries(portEnv)
+      .filter(([key]) => key !== "COMPOSE_FILE")
+      .map(([key, val]) => `${key}=${val}`)
+      .join(", ")
+    if (assignments) {
+      lines.push(`Docker port assignments: ${assignments}`)
+      lines.push("Use these ports when accessing services on localhost.")
+    }
   }
 
   lines.push("Focus only on the issue. Make the smallest change possible. Use existing patterns.")

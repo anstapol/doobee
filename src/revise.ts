@@ -1,5 +1,6 @@
 import { buildRevisionPrompt, buildSystemPrompt, formatOutput, runClaude } from "./claude"
 import { runCommands } from "./commands"
+import { isolateDockerPorts } from "./docker"
 import {
   configureAuth,
   createWorktree,
@@ -95,6 +96,7 @@ export async function revise(ctx: ReviseContext): Promise<void> {
   const wtPath = wtResult.value
 
   let started = false
+  const dockerEnv = await isolateDockerPorts(wtPath)
   try {
     // 3. Fetch review comments
     const reviews = reviewId
@@ -111,13 +113,13 @@ export async function revise(ctx: ReviseContext): Promise<void> {
         })
 
     // 4. Run setup and start commands
-    await runCommands(config.commands.setup, wtPath)
-    await runCommands(config.commands.start, wtPath)
+    await runCommands(config.commands.setup, wtPath, dockerEnv)
+    await runCommands(config.commands.start, wtPath, dockerEnv)
     started = true
 
     // 5. Build prompts and run Claude
     const prompt = buildRevisionPrompt(pr, reviews, config, extraContext)
-    const systemPrompt = buildSystemPrompt(config)
+    const systemPrompt = buildSystemPrompt(config, dockerEnv)
     const sha = await getCurrentSha(wtPath)
 
     console.log(`[revise] Running Claude for PR #${pr.number}`)
@@ -127,6 +129,7 @@ export async function revise(ctx: ReviseContext): Promise<void> {
       cwd: wtPath,
       model: config.model,
       timeout: config.timeout,
+      env: dockerEnv,
     })
 
     // 6. Handle result
@@ -177,7 +180,7 @@ export async function revise(ctx: ReviseContext): Promise<void> {
     })
     // 8. Run stop commands (only if start succeeded)
     if (started) {
-      await runCommands(config.commands.stop, wtPath)
+      await runCommands(config.commands.stop, wtPath, dockerEnv)
     }
     // 9. Clean up worktree
     await removeWorktree(repoDir, pr.branch)
