@@ -43,13 +43,14 @@ export async function handleLabeled(
 
   queue.enqueue({
     id: `solve-${owner}/${repo}#${issue.number}`,
-    run: () =>
+    run: (signal) =>
       solve({
         issue,
         installationId,
         github,
         config,
         repoDir,
+        signal,
       }),
   })
 }

@@ -48,7 +48,7 @@ export async function handleReview(
 
   queue.enqueue({
     id: `revise-${owner}/${repo}#${pr.number}`,
-    run: () =>
+    run: (signal) =>
       revise({
         pr,
         reviewId: payload.review.id,
@@ -56,6 +56,7 @@ export async function handleReview(
         github,
         config,
         repoDir,
+        signal,
       }),
   })
 }

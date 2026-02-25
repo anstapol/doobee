@@ -69,7 +69,7 @@ export async function handleComment(
 
     queue.enqueue({
       id: `solve-${owner}/${repo}#${issue.number}`,
-      run: () =>
+      run: (signal) =>
         solve({
           issue,
           installationId,
@@ -77,6 +77,7 @@ export async function handleComment(
           config,
           repoDir,
           extraContext,
+          signal,
         }),
     })
   } else {
@@ -100,7 +101,7 @@ export async function handleComment(
 
       queue.enqueue({
         id: `revise-${owner}/${repo}#${pr.number}`,
-        run: () =>
+        run: (signal) =>
           revise({
             pr,
             installationId,
@@ -108,6 +109,7 @@ export async function handleComment(
             config,
             repoDir,
             extraContext,
+            signal,
           }),
       })
     } else {
@@ -115,7 +117,7 @@ export async function handleComment(
 
       queue.enqueue({
         id: `review-pr-${owner}/${repo}#${pr.number}`,
-        run: () =>
+        run: (signal) =>
           reviewPr({
             pr,
             baseBranch,
@@ -124,6 +126,7 @@ export async function handleComment(
             config,
             repoDir,
             extraContext,
+            signal,
           }),
       })
     }

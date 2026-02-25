@@ -13,7 +13,12 @@ export async function runClaude(opts: {
   timeout?: number
   env?: Record<string, string>
   label?: string
+  signal?: AbortSignal
 }): Promise<ClaudeResult> {
+  if (opts.signal?.aborted) {
+    return { status: "crashed", output: "Cancelled" }
+  }
+
   const args = [
     "claude",
     "-p",
@@ -34,6 +39,10 @@ export async function runClaude(opts: {
     stderr: "pipe",
     env: opts.env ? { ...process.env, ...opts.env } : undefined,
   })
+
+  const onAbort = () => proc.kill()
+  opts.signal?.addEventListener("abort", onAbort, { once: true })
+  if (opts.signal?.aborted) proc.kill()
 
   const timeoutMs = (opts.timeout ?? 3600) * 1000
   const timer = setTimeout(() => proc.kill(), timeoutMs)
@@ -56,6 +65,7 @@ export async function runClaude(opts: {
   const exitCode = await proc.exited
   clearTimeout(timer)
   clearTimeout(heartbeatHandle)
+  opts.signal?.removeEventListener("abort", onAbort)
   const output = stdout + stderr
 
   if (output.includes("[DOOBEE:STUCK]")) {

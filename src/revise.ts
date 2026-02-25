@@ -29,10 +29,11 @@ export interface ReviseContext {
   config: DoobeeConfig
   repoDir: string
   extraContext?: string
+  signal?: AbortSignal
 }
 
 export async function revise(ctx: ReviseContext): Promise<void> {
-  const { pr, reviewId, installationId, github, config, repoDir, extraContext } = ctx
+  const { pr, reviewId, installationId, github, config, repoDir, extraContext, signal } = ctx
   const octokit = await github.api(installationId)
 
   // Add in-progress label and remove trigger label
@@ -176,6 +177,7 @@ export async function revise(ctx: ReviseContext): Promise<void> {
       timeout: config.timeout,
       env: mergedEnv,
       label: `PR #${pr.number}`,
+      signal,
     })
 
     // 6. Handle result

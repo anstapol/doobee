@@ -30,6 +30,7 @@ export interface SolveContext {
   config: DoobeeConfig
   repoDir: string
   extraContext?: string
+  signal?: AbortSignal
 }
 
 async function markStuck(octokit: Octokit, issue: Issue, reason: string): Promise<void> {
@@ -48,7 +49,7 @@ async function markStuck(octokit: Octokit, issue: Issue, reason: string): Promis
 }
 
 export async function solve(ctx: SolveContext): Promise<void> {
-  const { issue, installationId, github, config, repoDir, extraContext } = ctx
+  const { issue, installationId, github, config, repoDir, extraContext, signal } = ctx
   const octokit = await github.api(installationId)
 
   // Add in-progress label and remove solve trigger
@@ -165,6 +166,7 @@ export async function solve(ctx: SolveContext): Promise<void> {
         timeout: config.timeout,
         env: mergedEnv,
         label: `#${current.number}`,
+        signal,
       })
 
       if (result.status === "solved") {

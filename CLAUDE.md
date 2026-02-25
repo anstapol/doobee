@@ -88,18 +88,24 @@ installation.created / installation_repositories.added webhook
 
 ### Webhook events
 
-The server listens for exactly seven events:
+The server listens for exactly nine events:
 - `issues.labeled` — triggers solve (when label is `doobee:solve`)
+- `issues.unlabeled` — cancels running/pending job (when `doobee:in-progress` is removed)
 - `pull_request.labeled` — triggers review (`doobee:review`) or revise (`doobee:revise`)
+- `pull_request.unlabeled` — cancels running/pending job (when `doobee:in-progress` is removed)
 - `pull_request.review_requested` — triggers review (when requested reviewer is bot)
 - `issue_comment.created` — triggers solve, review, or revise (when comment mentions bot with a command)
 - `pull_request_review.submitted` — triggers revise (auto, only if "changes requested" on a bot PR)
 - `installation.created` — creates labels
 - `installation_repositories.added` — creates labels
 
+### Cancellation
+
+Removing the `doobee:in-progress` label from an issue or PR cancels the corresponding job. The `issues.unlabeled` / `pull_request.unlabeled` webhook fires, `src/handlers/unlabeled.ts` computes candidate job IDs and calls `queue.cancel(id)`. For running jobs, `cancel()` aborts the `AbortController` whose signal is threaded through to `runClaude()`, which kills the Claude process. For pending (queued but not started) jobs, `cancel()` removes them from the queue. The `finally` blocks in solve/revise/review-pr handle cleanup (worktree removal, stop commands) naturally.
+
 ### Job queue
 
-Global single-job queue. One Claude session at a time. Not persisted — if the server restarts, queued jobs are lost (webhooks can be replayed).
+Global single-job queue. One Claude session at a time. Jobs receive an `AbortSignal` from the queue's `AbortController`. Not persisted — if the server restarts, queued jobs are lost (webhooks can be replayed).
 
 ### Worktree lifecycle
 
@@ -144,6 +150,7 @@ Variables are merged with Docker port env vars. Docker ports take precedence if 
 - `src/handlers/review-requested.ts` — Handle `pull_request.review_requested` webhook (review when bot added as reviewer).
 - `src/handlers/comment.ts` — Handle `issue_comment.created` webhook (comment commands).
 - `src/handlers/review.ts` — Handle `pull_request_review.submitted` webhook (auto-revise).
+- `src/handlers/unlabeled.ts` — Handle `issues.unlabeled` and `pull_request.unlabeled` webhooks (cancel on `doobee:in-progress` removal).
 - `src/handlers/install.ts` — Handle `installation.created` and `installation_repositories.added` webhooks.
 - `src/types.ts` — Shared domain types: `Issue`, `SubIssueGroup`, `ReviewComment`, `PullRequest`, `InlineComment`, `DoobeeConfig`, `Result<T>`.
 - `schema.json` — JSON Schema for `.doobee.json` config files.

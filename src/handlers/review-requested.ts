@@ -49,7 +49,7 @@ export async function handleReviewRequested(
 
   queue.enqueue({
     id: `review-pr-${owner}/${repo}#${pr.number}`,
-    run: () =>
+    run: (signal) =>
       reviewPr({
         pr,
         baseBranch,
@@ -57,6 +57,7 @@ export async function handleReviewRequested(
         github,
         config,
         repoDir,
+        signal,
       }),
   })
 }
