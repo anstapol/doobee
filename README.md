@@ -142,6 +142,7 @@ WEBHOOK_SECRET=your-webhook-secret
 REPOS_DIR=./repos
 PORT=4567
 BOT_NAME=doobeebot[bot]
+ALLOWED_ACCOUNTS=myorg,myuser
 ```
 
 | Variable | Required | Description |
@@ -152,6 +153,7 @@ BOT_NAME=doobeebot[bot]
 | `REPOS_DIR` | No | Where repos are cloned (default: `./repos`) |
 | `PORT` | No | Server port (default: `4567`) |
 | `BOT_NAME` | No | Bot login name (default: `doobeebot[bot]`) |
+| `ALLOWED_ACCOUNTS` | Yes | Comma-separated GitHub usernames/orgs to allow. If empty, all webhooks are skipped. |
 
 Repos are cloned to `<REPOS_DIR>/<owner>/<repo>` using the `clone_url` from the webhook payload. Auth uses the GitHub App installation token via Octokit.
 
