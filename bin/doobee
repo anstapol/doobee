@@ -76,7 +76,7 @@ cmd_logs() {
     args+=(-f)
   fi
 
-  ssh "$VPS_HOST" "journalctl -u $SERVICE_NAME ${args[*]}"
+  ssh -t "$VPS_HOST" "sudo journalctl -u $SERVICE_NAME ${args[*]}"
 }
 
 cmd_status() {
