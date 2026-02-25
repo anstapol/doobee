@@ -12,7 +12,15 @@ import {
   removeWorktree,
 } from "./git"
 import type { GitHub } from "./github"
-import { addLabel, createPr, fetchParent, fetchSubIssues, postComment, removeLabel } from "./github"
+import {
+  addLabel,
+  createPr,
+  fetchParent,
+  fetchRepoVariables,
+  fetchSubIssues,
+  postComment,
+  removeLabel,
+} from "./github"
 import type { DoobeeConfig, Issue, SubIssueGroup } from "./types"
 
 export interface SolveContext {
@@ -117,10 +125,16 @@ export async function solve(ctx: SolveContext): Promise<void> {
 
   let started = false
   const dockerEnv = await isolateDockerPorts(wtPath)
+  const repoVars = await fetchRepoVariables(octokit, {
+    owner: issue.repoOwner,
+    repo: issue.repoName,
+  })
+  const env = { ...repoVars, ...dockerEnv }
+  const mergedEnv = Object.keys(env).length > 0 ? env : undefined
   try {
     // 4. Run setup and start commands
-    await runCommands(config.commands.setup, wtPath, dockerEnv)
-    await runCommands(config.commands.start, wtPath, dockerEnv)
+    await runCommands(config.commands.setup, wtPath, mergedEnv)
+    await runCommands(config.commands.start, wtPath, mergedEnv)
     started = true
 
     // 5. Process each issue
@@ -139,7 +153,7 @@ export async function solve(ctx: SolveContext): Promise<void> {
         cwd: wtPath,
         model: config.model,
         timeout: config.timeout,
-        env: dockerEnv,
+        env: mergedEnv,
       })
 
       if (result.status === "solved") {
@@ -222,7 +236,7 @@ export async function solve(ctx: SolveContext): Promise<void> {
     })
     // 8. Run stop commands (only if start succeeded)
     if (started) {
-      await runCommands(config.commands.stop, wtPath, dockerEnv)
+      await runCommands(config.commands.stop, wtPath, mergedEnv)
     }
     // 9. Clean up worktree
     await removeWorktree(repoDir, group.branch)

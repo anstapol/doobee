@@ -116,6 +116,7 @@ bun install
    - **Issues**: Read & write (to label, comment)
    - **Pull requests**: Read & write (to create PRs, read reviews, label)
    - **Contents**: Read & write (to push branches)
+   - **Variables**: Read (to fetch repo variables as env vars — optional)
 5. Subscribe to these **events**:
    - Issues
    - Issue comments
@@ -202,6 +203,27 @@ All fields are optional. If `.doobee.json` is missing, defaults are used. See `s
 | `promptContext` | — | Extra context injected into Claude's prompt (repo conventions, stack info) |
 
 **Note:** `commands.setup`, `start`, and `stop` are run by Doobee directly (via `sh -c`). `commands.verify` and `fix` are instructions passed to Claude — Claude decides when and how to run them.
+
+## Repository variables
+
+Doobee can read [GitHub Actions repository variables](https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/store-information-in-variables) and pass them as environment variables to setup/start/stop commands and Claude's process. This is useful for credentials or configuration that setup scripts need (e.g. private package auth tokens).
+
+To use this:
+1. Add the **Variables: Read** permission to your GitHub App
+2. Add variables in your repo settings (**Settings → Secrets and variables → Actions → Variables**)
+3. Reference them in your setup scripts as normal env vars
+
+For example, if your repo needs authentication for a private Composer registry, add `NOVA_USER` and `NOVA_PASSWORD` as repo variables, then use them in your setup script:
+
+```bash
+# scripts/setup.sh
+if [ -n "$NOVA_USER" ] && [ ! -f auth.json ]; then
+  composer config http-basic.nova.laravel.com "$NOVA_USER" "$NOVA_PASSWORD"
+fi
+composer install
+```
+
+If the Variables permission is not granted, Doobee continues without repo variables (it logs a warning and degrades gracefully).
 
 ## Reference
 

@@ -11,7 +11,14 @@ import {
   removeWorktree,
 } from "./git"
 import type { GitHub } from "./github"
-import { addLabel, fetchAllReviews, fetchReviews, postComment, removeLabel } from "./github"
+import {
+  addLabel,
+  fetchAllReviews,
+  fetchRepoVariables,
+  fetchReviews,
+  postComment,
+  removeLabel,
+} from "./github"
 import type { DoobeeConfig, PullRequest } from "./types"
 
 export interface ReviseContext {
@@ -97,6 +104,12 @@ export async function revise(ctx: ReviseContext): Promise<void> {
 
   let started = false
   const dockerEnv = await isolateDockerPorts(wtPath)
+  const repoVars = await fetchRepoVariables(octokit, {
+    owner: pr.repoOwner,
+    repo: pr.repoName,
+  })
+  const env = { ...repoVars, ...dockerEnv }
+  const mergedEnv = Object.keys(env).length > 0 ? env : undefined
   try {
     // 3. Fetch review comments
     const reviews = reviewId
@@ -113,8 +126,8 @@ export async function revise(ctx: ReviseContext): Promise<void> {
         })
 
     // 4. Run setup and start commands
-    await runCommands(config.commands.setup, wtPath, dockerEnv)
-    await runCommands(config.commands.start, wtPath, dockerEnv)
+    await runCommands(config.commands.setup, wtPath, mergedEnv)
+    await runCommands(config.commands.start, wtPath, mergedEnv)
     started = true
 
     // 5. Build prompts and run Claude
@@ -129,7 +142,7 @@ export async function revise(ctx: ReviseContext): Promise<void> {
       cwd: wtPath,
       model: config.model,
       timeout: config.timeout,
-      env: dockerEnv,
+      env: mergedEnv,
     })
 
     // 6. Handle result
@@ -180,7 +193,7 @@ export async function revise(ctx: ReviseContext): Promise<void> {
     })
     // 8. Run stop commands (only if start succeeded)
     if (started) {
-      await runCommands(config.commands.stop, wtPath, dockerEnv)
+      await runCommands(config.commands.stop, wtPath, mergedEnv)
     }
     // 9. Clean up worktree
     await removeWorktree(repoDir, pr.branch)

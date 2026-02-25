@@ -324,6 +324,41 @@ export async function fetchPr(
   }
 }
 
+export async function fetchRepoVariables(
+  octokit: Octokit,
+  opts: { owner: string; repo: string },
+): Promise<Record<string, string> | undefined> {
+  try {
+    const vars: Record<string, string> = {}
+    let page = 1
+
+    while (true) {
+      const { data } = await octokit.request("GET /repos/{owner}/{repo}/actions/variables", {
+        owner: opts.owner,
+        repo: opts.repo,
+        per_page: 30,
+        page,
+      })
+
+      for (const v of data.variables) {
+        vars[v.name] = v.value
+      }
+
+      if (data.variables.length < 30) break
+      page++
+    }
+
+    if (Object.keys(vars).length === 0) return undefined
+    console.log(
+      `[github] Loaded ${Object.keys(vars).length} repo variables for ${opts.owner}/${opts.repo}`,
+    )
+    return vars
+  } catch (err) {
+    console.warn(`[github] Could not fetch repo variables for ${opts.owner}/${opts.repo}: ${err}`)
+    return undefined
+  }
+}
+
 export async function ensureLabel(
   octokit: Octokit,
   opts: { owner: string; repo: string; name: string; color: string; description: string },
