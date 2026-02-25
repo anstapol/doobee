@@ -178,6 +178,14 @@ cmd_trust() {
   _trust_write "$result"
 }
 
+cmd_restart() {
+  require_host
+  echo "Restarting $SERVICE_NAME on $VPS_HOST..."
+  ssh -t "$VPS_HOST" "sudo systemctl restart $SERVICE_NAME"
+  echo "Restarted. Fetching recent logs..."
+  ssh "$VPS_HOST" "sudo journalctl -u $SERVICE_NAME -n 5 --no-pager"
+}
+
 cmd_config() {
   if [[ $# -lt 2 ]]; then
     echo "Usage: doobee config <key> <value>" >&2
@@ -206,6 +214,7 @@ Usage: doobee <command> [options]
 Commands:
   deploy       Push code to VPS and restart service
   install      First-time VPS setup
+  restart      Restart the service on VPS
   logs         Tail service logs (follows by default)
     -n <N>       Show last N lines without following
   status       Show service status
@@ -229,6 +238,7 @@ load_config
 case "${1:-}" in
   deploy)  shift; cmd_deploy "$@" ;;
   install) shift; cmd_install "$@" ;;
+  restart) shift; cmd_restart "$@" ;;
   logs)    shift; cmd_logs "$@" ;;
   status)  shift; cmd_status "$@" ;;
   ssh)     shift; cmd_ssh "$@" ;;
