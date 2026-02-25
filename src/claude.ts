@@ -38,11 +38,16 @@ export async function runClaude(opts: {
   const timeoutMs = (opts.timeout ?? 3600) * 1000
   const timer = setTimeout(() => proc.kill(), timeoutMs)
   const startTime = Date.now()
-  const heartbeat = setInterval(() => {
-    const mins = Math.round((Date.now() - startTime) / 60_000)
-    const tag = opts.label ? `[claude] ${opts.label}` : "[claude]"
-    console.log(`${tag} Still working... (${mins}m elapsed)`)
-  }, 60_000)
+  let heartbeatDelay = 60_000
+  const scheduleHeartbeat = (): Timer =>
+    setTimeout(() => {
+      const mins = Math.round((Date.now() - startTime) / 60_000)
+      const tag = opts.label ? `[claude] ${opts.label}` : "[claude]"
+      console.log(`${tag} Still working... (${mins}m elapsed)`)
+      heartbeatDelay = Math.min(heartbeatDelay * 2, 30 * 60_000)
+      heartbeatHandle = scheduleHeartbeat()
+    }, heartbeatDelay)
+  let heartbeatHandle = scheduleHeartbeat()
 
   const [stdout, stderr] = await Promise.all([
     new Response(proc.stdout).text(),
@@ -50,7 +55,7 @@ export async function runClaude(opts: {
   ])
   const exitCode = await proc.exited
   clearTimeout(timer)
-  clearInterval(heartbeat)
+  clearTimeout(heartbeatHandle)
   const output = stdout + stderr
 
   if (output.includes("[DOOBEE:STUCK]")) {
