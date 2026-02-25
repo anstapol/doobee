@@ -124,7 +124,7 @@ REMOTE
   case "$subcmd" in
     add)
       echo "Adding: ${accounts[*]}"
-      ssh "$VPS_HOST" "bash -s" <<REMOTE
+      ssh -t "$VPS_HOST" "bash -s" <<REMOTE
         set -euo pipefail
         ENV_FILE="$env_file"
         current=""
@@ -167,7 +167,7 @@ REMOTE
       ;;
     remove)
       echo "Removing: ${accounts[*]}"
-      ssh "$VPS_HOST" "bash -s" <<REMOTE
+      ssh -t "$VPS_HOST" "bash -s" <<REMOTE
         set -euo pipefail
         ENV_FILE="$env_file"
         current=""
