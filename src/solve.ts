@@ -1,6 +1,7 @@
 import type { Octokit } from "@octokit/core"
 import { buildSolvePrompt, buildSystemPrompt, formatOutput, runClaude } from "./claude"
 import { runCommands } from "./commands"
+import { isolateDockerPorts } from "./docker"
 import {
   configureAuth,
   createWorktree,
@@ -115,10 +116,11 @@ export async function solve(ctx: SolveContext): Promise<void> {
   const wtPath = wtResult.value
 
   let started = false
+  const dockerEnv = await isolateDockerPorts(wtPath)
   try {
     // 4. Run setup and start commands
-    await runCommands(config.commands.setup, wtPath)
-    await runCommands(config.commands.start, wtPath)
+    await runCommands(config.commands.setup, wtPath, dockerEnv)
+    await runCommands(config.commands.start, wtPath, dockerEnv)
     started = true
 
     // 5. Process each issue
@@ -128,7 +130,7 @@ export async function solve(ctx: SolveContext): Promise<void> {
     for (const current of group.issues) {
       const sha = await getCurrentSha(wtPath)
       const prompt = buildSolvePrompt(current, config, extraContext)
-      const systemPrompt = buildSystemPrompt(config)
+      const systemPrompt = buildSystemPrompt(config, dockerEnv)
 
       console.log(`[solve] Running Claude for issue #${current.number}`)
       const result = await runClaude({
@@ -137,6 +139,7 @@ export async function solve(ctx: SolveContext): Promise<void> {
         cwd: wtPath,
         model: config.model,
         timeout: config.timeout,
+        env: dockerEnv,
       })
 
       if (result.status === "solved") {
@@ -219,7 +222,7 @@ export async function solve(ctx: SolveContext): Promise<void> {
     })
     // 8. Run stop commands (only if start succeeded)
     if (started) {
-      await runCommands(config.commands.stop, wtPath)
+      await runCommands(config.commands.stop, wtPath, dockerEnv)
     }
     // 9. Clean up worktree
     await removeWorktree(repoDir, group.branch)
