@@ -157,9 +157,9 @@ REMOTE
           fi
         done
         if grep -q '^ALLOWED_ACCOUNTS=' "\$ENV_FILE" 2>/dev/null; then
-          sed -i "s|^ALLOWED_ACCOUNTS=.*|ALLOWED_ACCOUNTS=\$result|" "\$ENV_FILE"
+          sudo sed -i "s|^ALLOWED_ACCOUNTS=.*|ALLOWED_ACCOUNTS=\$result|" "\$ENV_FILE"
         else
-          echo "ALLOWED_ACCOUNTS=\$result" >> "\$ENV_FILE"
+          echo "ALLOWED_ACCOUNTS=\$result" | sudo tee -a "\$ENV_FILE" > /dev/null
         fi
         sudo systemctl restart doobee
         echo "Updated: \$result"
@@ -195,9 +195,9 @@ REMOTE
           fi
         done
         if grep -q '^ALLOWED_ACCOUNTS=' "\$ENV_FILE" 2>/dev/null; then
-          sed -i "s|^ALLOWED_ACCOUNTS=.*|ALLOWED_ACCOUNTS=\$result|" "\$ENV_FILE"
+          sudo sed -i "s|^ALLOWED_ACCOUNTS=.*|ALLOWED_ACCOUNTS=\$result|" "\$ENV_FILE"
         else
-          echo "ALLOWED_ACCOUNTS=\$result" >> "\$ENV_FILE"
+          echo "ALLOWED_ACCOUNTS=\$result" | sudo tee -a "\$ENV_FILE" > /dev/null
         fi
         sudo systemctl restart doobee
         echo "Updated: \$result"
