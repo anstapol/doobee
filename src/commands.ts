@@ -1,6 +1,6 @@
 import type { Result } from "./types"
 
-const DEFAULT_COMMAND_TIMEOUT = 10 * 60_000 // 10 minutes
+const DEFAULT_COMMAND_TIMEOUT = 20 * 60_000 // 20 minutes
 
 export async function runCommands(
   commands: string[],
