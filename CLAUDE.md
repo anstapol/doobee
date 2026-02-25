@@ -24,7 +24,8 @@ issues.labeled webhook (doobee:solve)
       2. github.fetchParent() / fetchSubIssues() — detect sub-issue group
       3. git.createWorktree() — isolated branch from baseBranch
       3b. docker.isolateDockerPorts() — remap Docker ports if compose file exists
-      4. Run commands.setup + commands.start (Bun.spawn, with Docker port env)
+      3c. github.fetchRepoVariables() — fetch repo variables as env vars (graceful degradation)
+      4. Run commands.setup + commands.start (Bun.spawn, with merged env: repo vars + Docker ports)
       5. For each issue in group:
          - claude.runClaude(buildSolvePrompt(), buildSystemPrompt())
          - Check result: solved → track / stuck → label + break
@@ -42,8 +43,9 @@ pull_request.labeled webhook (doobee:revise) OR pull_request_review.submitted we
       1. git.fetch()
       2. git.createWorktree() — checkout existing PR branch
       2b. docker.isolateDockerPorts() — remap Docker ports if compose file exists
+      2c. github.fetchRepoVariables() — fetch repo variables as env vars (graceful degradation)
       3. github.fetchReviews() or fetchAllReviews() — review-level + inline comments with diff hunks
-      4. Run commands.setup + commands.start (with Docker port env)
+      4. Run commands.setup + commands.start (with merged env: repo vars + Docker ports)
       5. claude.runClaude(buildRevisionPrompt(), buildSystemPrompt())
       6. If solved + new commits: git.push() to PR branch
          If stuck: label doobee:stuck on PR + comment
@@ -115,13 +117,21 @@ Before running commands in a worktree, `isolateDockerPorts()` checks for a compo
 
 Override file is auto-cleaned when the worktree is removed. No compose file or no ports → no-op.
 
+### Repository variables
+
+Solve and revise flows fetch GitHub Actions repository variables (`GET /repos/{owner}/{repo}/actions/variables`) and pass them as env vars to all commands (setup, start, stop) and Claude's process. This lets repos store credentials (e.g. `NOVA_USER`, `NOVA_PASSWORD`) that setup scripts need without hardcoding them on the VPS.
+
+Requires the **Variables: Read** repository permission on the GitHub App. If the permission is missing or the API call fails, the fetch degrades gracefully (logs a warning, continues without repo variables).
+
+Repo variables are merged with Docker port env vars. Docker ports take precedence if there's a name collision.
+
 ## Project Structure
 
 - `src/server.ts` — HTTP server, webhook signature verification, event routing. Entry point.
 - `src/queue.ts` — Global single-job queue.
 - `src/solve.ts` — Core solve flow: worktree → prompt → Claude → PR.
 - `src/revise.ts` — Revision flow: read review comments → Claude → push fixes.
-- `src/github.ts` — Octokit wrapper. App auth, PRs, labels, comments, reviews. All functions take an authenticated `Octokit` instance as first arg.
+- `src/github.ts` — Octokit wrapper. App auth, PRs, labels, comments, reviews, repo variables. All functions take an authenticated `Octokit` instance as first arg.
 - `src/git.ts` — Git worktree management, branches, push, commit detection. All via `Bun.spawn`.
 - `src/claude.ts` — Spawn Claude CLI, build prompts (solve/revise/review/system), parse output markers.
 - `src/config.ts` — Load `.doobee.json` from repos, merge with defaults. Exports `DEFAULT_CONFIG`.
