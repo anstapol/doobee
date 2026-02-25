@@ -133,8 +133,18 @@ export async function solve(ctx: SolveContext): Promise<void> {
   const mergedEnv = Object.keys(env).length > 0 ? env : undefined
   try {
     // 4. Run setup and start commands
-    await runCommands(config.commands.setup, wtPath, mergedEnv)
-    await runCommands(config.commands.start, wtPath, mergedEnv)
+    const setupResult = await runCommands(config.commands.setup, wtPath, mergedEnv)
+    if (!setupResult.ok) {
+      console.error(`[solve] Setup failed: ${setupResult.error}`)
+      await markStuck(octokit, issue, `Setup command failed: ${setupResult.error}`)
+      return
+    }
+    const startResult = await runCommands(config.commands.start, wtPath, mergedEnv)
+    if (!startResult.ok) {
+      console.error(`[solve] Start failed: ${startResult.error}`)
+      await markStuck(octokit, issue, `Start command failed: ${startResult.error}`)
+      return
+    }
     started = true
 
     // 5. Process each issue
