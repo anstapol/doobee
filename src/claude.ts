@@ -33,6 +33,11 @@ export async function runClaude(opts: {
 
   args.push(opts.prompt)
 
+  const tag = opts.label ? `[claude] ${opts.label}` : "[claude]"
+  console.log(
+    `${tag} Starting Claude (model: ${opts.model ?? "default"}, timeout: ${opts.timeout ?? 3600}s)`,
+  )
+
   const proc = Bun.spawn(args, {
     cwd: opts.cwd,
     stdout: "pipe",
@@ -40,18 +45,22 @@ export async function runClaude(opts: {
     env: opts.env ? { ...process.env, ...opts.env } : undefined,
   })
 
+  console.log(`${tag} Claude process spawned (pid: ${proc.pid})`)
+
   const onAbort = () => proc.kill()
   opts.signal?.addEventListener("abort", onAbort, { once: true })
   if (opts.signal?.aborted) proc.kill()
 
   const timeoutMs = (opts.timeout ?? 3600) * 1000
-  const timer = setTimeout(() => proc.kill(), timeoutMs)
+  const timer = setTimeout(() => {
+    console.error(`${tag} Timed out after ${opts.timeout ?? 3600}s, killing process`)
+    proc.kill()
+  }, timeoutMs)
   const startTime = Date.now()
   let heartbeatDelay = 60_000
   const scheduleHeartbeat = (): Timer =>
     setTimeout(() => {
       const mins = Math.round((Date.now() - startTime) / 60_000)
-      const tag = opts.label ? `[claude] ${opts.label}` : "[claude]"
       console.log(`${tag} Still working... (${mins}m elapsed)`)
       heartbeatDelay = Math.min(heartbeatDelay * 2, 30 * 60_000)
       heartbeatHandle = scheduleHeartbeat()
@@ -68,15 +77,21 @@ export async function runClaude(opts: {
   opts.signal?.removeEventListener("abort", onAbort)
   const output = stdout + stderr
 
+  const elapsed = Math.round((Date.now() - startTime) / 1000)
+
   if (output.includes("[DOOBEE:STUCK]")) {
+    console.log(`${tag} Finished: stuck (${elapsed}s, exit ${exitCode})`)
     return { status: "stuck", output }
   }
   if (output.includes("[DOOBEE:COMPLETE]")) {
+    console.log(`${tag} Finished: complete (${elapsed}s, exit ${exitCode})`)
     return { status: "complete", output }
   }
   if (exitCode !== 0) {
+    console.error(`${tag} Finished: crashed (${elapsed}s, exit ${exitCode})`)
     return { status: "crashed", output }
   }
+  console.log(`${tag} Finished: solved (${elapsed}s)`)
   return { status: "solved", output }
 }
 
