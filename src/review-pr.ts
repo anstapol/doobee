@@ -84,6 +84,7 @@ export async function reviewPr(ctx: ReviewPrContext): Promise<void> {
       cwd: wtPath,
       model: config.model,
       timeout: config.timeout,
+      label: `PR #${pr.number}`,
     })
 
     if (result.status === "crashed") {

@@ -164,6 +164,7 @@ export async function solve(ctx: SolveContext): Promise<void> {
         model: config.model,
         timeout: config.timeout,
         env: mergedEnv,
+        label: `#${current.number}`,
       })
 
       if (result.status === "solved") {
