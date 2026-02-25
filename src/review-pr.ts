@@ -18,10 +18,11 @@ export interface ReviewPrContext {
   config: DoobeeConfig
   repoDir: string
   extraContext?: string
+  signal?: AbortSignal
 }
 
 export async function reviewPr(ctx: ReviewPrContext): Promise<void> {
-  const { pr, baseBranch, installationId, github, config, repoDir, extraContext } = ctx
+  const { pr, baseBranch, installationId, github, config, repoDir, extraContext, signal } = ctx
   const octokit = await github.api(installationId)
 
   // Remove trigger label
@@ -85,6 +86,7 @@ export async function reviewPr(ctx: ReviewPrContext): Promise<void> {
       model: config.model,
       timeout: config.timeout,
       label: `PR #${pr.number}`,
+      signal,
     })
 
     if (result.status === "crashed") {

@@ -6,6 +6,7 @@ import { handleLabeled } from "./handlers/labeled"
 import { handlePrLabeled } from "./handlers/pr-labeled"
 import { handleReview } from "./handlers/review"
 import { handleReviewRequested } from "./handlers/review-requested"
+import { handleUnlabeled } from "./handlers/unlabeled"
 import { createQueue } from "./queue"
 
 const appId = process.env.APP_ID
@@ -60,6 +61,14 @@ webhooks.on("pull_request_review.submitted", async (event) => {
 
 webhooks.on("pull_request.review_requested", async (event) => {
   await handleReviewRequested(event, github, queue, reposDir, botName)
+})
+
+webhooks.on("issues.unlabeled", (event) => {
+  handleUnlabeled(event, queue)
+})
+
+webhooks.on("pull_request.unlabeled", (event) => {
+  handleUnlabeled(event, queue)
 })
 
 webhooks.on("installation.created", async (event) => {

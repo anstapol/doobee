@@ -38,6 +38,10 @@ Comment on an issue or PR to trigger Doobee directly:
 - `@doobeebot` — defaults to `solve` on issues, `review` on PRs
 - `@doobeebot solve focus on the API layer` — text after the command becomes extra context in Claude's prompt
 
+### Cancelling a running job
+
+Remove the `doobee:in-progress` label from an issue or PR to immediately kill the running Claude process. The worktree is cleaned up, stop commands run, and the queue moves on. If the job is still queued (not yet started), removing the label dequeues it.
+
 ### When it gets stuck
 
 If Claude can't resolve an issue after `maxRetries` attempts, Doobee:
