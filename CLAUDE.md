@@ -117,13 +117,13 @@ Before running commands in a worktree, `isolateDockerPorts()` checks for a compo
 
 Override file is auto-cleaned when the worktree is removed. No compose file or no ports → no-op.
 
-### Repository variables
+### Repository and organization variables
 
-Solve and revise flows fetch GitHub Actions repository variables (`GET /repos/{owner}/{repo}/actions/variables`) and pass them as env vars to all commands (setup, start, stop) and Claude's process. This lets repos store credentials (e.g. `NOVA_USER`, `NOVA_PASSWORD`) that setup scripts need without hardcoding them on the VPS.
+Solve and revise flows fetch GitHub Actions variables from both the organization (`GET /orgs/{org}/actions/variables`) and the repository (`GET /repos/{owner}/{repo}/actions/variables`), then merge them. Repo variables take precedence over org variables. These are passed as env vars to all commands (setup, start, stop) and Claude's process. This lets orgs/repos store credentials (e.g. `NOVA_USER`, `NOVA_PASSWORD`) that setup scripts need without hardcoding them on the VPS.
 
-Requires the **Variables: Read** repository permission on the GitHub App. If the permission is missing or the API call fails, the fetch degrades gracefully (logs a warning, continues without repo variables).
+Requires the **Variables: Read** repository permission and **Organization variables: Read** organization permission on the GitHub App. If either permission is missing or an API call fails, the fetch degrades gracefully (logs a warning, continues without those variables).
 
-Repo variables are merged with Docker port env vars. Docker ports take precedence if there's a name collision.
+Variables are merged with Docker port env vars. Docker ports take precedence if there's a name collision.
 
 ## Project Structure
 

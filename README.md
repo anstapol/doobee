@@ -117,6 +117,7 @@ bun install
    - **Pull requests**: Read & write (to create PRs, read reviews, label)
    - **Contents**: Read & write (to push branches)
    - **Variables**: Read (to fetch repo variables as env vars — optional)
+   - **Organization variables**: Read (to fetch org variables as env vars — optional)
 5. Subscribe to these **events**:
    - Issues
    - Issue comments
@@ -204,13 +205,13 @@ All fields are optional. If `.doobee.json` is missing, defaults are used. See `s
 
 **Note:** `commands.setup`, `start`, and `stop` are run by Doobee directly (via `sh -c`). `commands.verify` and `fix` are instructions passed to Claude — Claude decides when and how to run them.
 
-## Repository variables
+## Repository and organization variables
 
-Doobee can read [GitHub Actions repository variables](https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/store-information-in-variables) and pass them as environment variables to setup/start/stop commands and Claude's process. This is useful for credentials or configuration that setup scripts need (e.g. private package auth tokens).
+Doobee can read [GitHub Actions variables](https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/store-information-in-variables) from both the organization and the repository, and pass them as environment variables to setup/start/stop commands and Claude's process. Repo variables take precedence over org variables. This is useful for credentials or configuration that setup scripts need (e.g. private package auth tokens).
 
 To use this:
-1. Add the **Variables: Read** permission to your GitHub App
-2. Add variables in your repo settings (**Settings → Secrets and variables → Actions → Variables**)
+1. Add the **Variables: Read** repository permission and **Organization variables: Read** organization permission to your GitHub App
+2. Add variables in your org or repo settings (**Settings → Secrets and variables → Actions → Variables**)
 3. Reference them in your setup scripts as normal env vars
 
 For example, if your repo needs authentication for a private Composer registry, add `NOVA_USER` and `NOVA_PASSWORD` as repo variables, then use them in your setup script:
@@ -223,7 +224,7 @@ fi
 composer install
 ```
 
-If the Variables permission is not granted, Doobee continues without repo variables (it logs a warning and degrades gracefully).
+If permissions are not granted, Doobee continues without those variables (it logs a warning and degrades gracefully).
 
 ## Reference
 

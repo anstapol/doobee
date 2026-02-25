@@ -329,34 +329,59 @@ export async function fetchRepoVariables(
   opts: { owner: string; repo: string },
 ): Promise<Record<string, string> | undefined> {
   try {
-    const vars: Record<string, string> = {}
-    let page = 1
+    const orgVars = await fetchOrgVariables(octokit, opts.owner)
+    const repoVars = await fetchVariables(octokit, `GET /repos/{owner}/{repo}/actions/variables`, {
+      owner: opts.owner,
+      repo: opts.repo,
+    })
 
-    while (true) {
-      const { data } = await octokit.request("GET /repos/{owner}/{repo}/actions/variables", {
-        owner: opts.owner,
-        repo: opts.repo,
-        per_page: 30,
-        page,
-      })
-
-      for (const v of data.variables) {
-        vars[v.name] = v.value
-      }
-
-      if (data.variables.length < 30) break
-      page++
-    }
-
+    const vars = { ...orgVars, ...repoVars }
     if (Object.keys(vars).length === 0) return undefined
+
+    const orgCount = Object.keys(orgVars).length
+    const repoCount = Object.keys(repoVars).length
     console.log(
-      `[github] Loaded ${Object.keys(vars).length} repo variables for ${opts.owner}/${opts.repo}`,
+      `[github] Loaded ${repoCount} repo + ${orgCount} org variables for ${opts.owner}/${opts.repo}`,
     )
     return vars
   } catch (err) {
     console.warn(`[github] Could not fetch repo variables for ${opts.owner}/${opts.repo}: ${err}`)
     return undefined
   }
+}
+
+async function fetchOrgVariables(octokit: Octokit, org: string): Promise<Record<string, string>> {
+  try {
+    return await fetchVariables(octokit, `GET /orgs/{org}/actions/variables`, { org })
+  } catch {
+    return {}
+  }
+}
+
+async function fetchVariables(
+  octokit: Octokit,
+  route: string,
+  params: Record<string, string>,
+): Promise<Record<string, string>> {
+  const vars: Record<string, string> = {}
+  let page = 1
+
+  while (true) {
+    const { data } = await octokit.request(route, {
+      ...params,
+      per_page: 30,
+      page,
+    })
+
+    for (const v of (data as { variables: { name: string; value: string }[] }).variables) {
+      vars[v.name] = v.value
+    }
+
+    if ((data as { variables: unknown[] }).variables.length < 30) break
+    page++
+  }
+
+  return vars
 }
 
 export async function ensureLabel(
