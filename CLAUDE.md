@@ -137,6 +137,7 @@ Override file is auto-cleaned when the worktree is removed. No compose file or n
 - `src/handlers/install.ts` — Handle `installation.created` and `installation_repositories.added` webhooks.
 - `src/types.ts` — Shared domain types: `Issue`, `SubIssueGroup`, `ReviewComment`, `PullRequest`, `InlineComment`, `DoobeeConfig`, `Result<T>`.
 - `schema.json` — JSON Schema for `.doobee.json` config files.
+- `bin/doobee` — CLI for VPS management (deploy, logs, status, ssh). Config at `~/.config/doobee`.
 
 ## Philosophy
 

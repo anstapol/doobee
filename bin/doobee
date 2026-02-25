@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CONFIG_FILE="$HOME/.config/doobee"
+SERVICE_NAME="doobee"
+
+# --- Config helpers ---
+
+load_config() {
+  if [[ -f "$CONFIG_FILE" ]]; then
+    # shellcheck source=/dev/null
+    source "$CONFIG_FILE"
+  fi
+}
+
+require_host() {
+  if [[ -z "${VPS_HOST:-}" ]]; then
+    echo "Error: VPS_HOST not configured." >&2
+    echo "Run: doobee config vps_host root@your-server" >&2
+    exit 1
+  fi
+}
+
+# --- Commands ---
+
+cmd_deploy() {
+  require_host
+  local root
+  root=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "Error: not a git repository" >&2; exit 1; }
+
+  if [[ ! -f "$root/deploy/deploy.sh" ]]; then
+    echo "Error: deploy/deploy.sh not found in repo root" >&2
+    exit 1
+  fi
+
+  echo "Deploying to $VPS_HOST..."
+  git -C "$root" archive --format=tar HEAD | ssh "$VPS_HOST" 'mkdir -p /tmp/doobee && tar -xf - -C /tmp/doobee'
+  ssh "$VPS_HOST" 'sudo bash /tmp/doobee/deploy/deploy.sh'
+  echo "Done."
+}
+
+cmd_install() {
+  require_host
+  local root
+  root=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "Error: not a git repository" >&2; exit 1; }
+
+  if [[ ! -f "$root/deploy/install.sh" ]]; then
+    echo "Error: deploy/install.sh not found in repo root" >&2
+    exit 1
+  fi
+
+  echo "Installing on $VPS_HOST..."
+  git -C "$root" archive --format=tar HEAD | ssh "$VPS_HOST" 'mkdir -p /tmp/doobee && tar -xf - -C /tmp/doobee'
+  ssh "$VPS_HOST" 'sudo bash /tmp/doobee/deploy/install.sh'
+  echo "Done."
+}
+
+cmd_logs() {
+  require_host
+  local follow=true
+  local lines=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -n) lines="$2"; shift 2 ;;
+      *) echo "Unknown option: $1" >&2; exit 1 ;;
+    esac
+  done
+
+  local args=()
+  if [[ -n "$lines" ]]; then
+    args+=(-n "$lines")
+    follow=false
+  fi
+  if [[ "$follow" == true ]]; then
+    args+=(-f)
+  fi
+
+  ssh "$VPS_HOST" "journalctl -u $SERVICE_NAME ${args[*]}"
+}
+
+cmd_status() {
+  require_host
+  ssh "$VPS_HOST" "systemctl status $SERVICE_NAME" || true
+}
+
+cmd_ssh() {
+  require_host
+  ssh "$VPS_HOST"
+}
+
+cmd_config() {
+  if [[ $# -lt 2 ]]; then
+    echo "Usage: doobee config <key> <value>" >&2
+    exit 1
+  fi
+
+  local key="${1^^}" # uppercase
+  local value="$2"
+
+  mkdir -p "$(dirname "$CONFIG_FILE")"
+
+  if [[ -f "$CONFIG_FILE" ]] && grep -q "^${key}=" "$CONFIG_FILE"; then
+    sed -i.bak "s|^${key}=.*|${key}=${value}|" "$CONFIG_FILE"
+    rm -f "${CONFIG_FILE}.bak"
+  else
+    echo "${key}=${value}" >> "$CONFIG_FILE"
+  fi
+
+  echo "Set $key=$value"
+}
+
+usage() {
+  cat <<'EOF'
+Usage: doobee <command> [options]
+
+Commands:
+  deploy       Push code to VPS and restart service
+  install      First-time VPS setup
+  logs         Tail service logs (follows by default)
+    -n <N>       Show last N lines without following
+  status       Show service status
+  ssh          Open SSH session to VPS
+  config       Set config values
+    vps_host     SSH target (e.g. root@1.2.3.4)
+
+Setup:
+  doobee config vps_host root@your-server
+EOF
+}
+
+# --- Main ---
+
+load_config
+
+case "${1:-}" in
+  deploy)  shift; cmd_deploy "$@" ;;
+  install) shift; cmd_install "$@" ;;
+  logs)    shift; cmd_logs "$@" ;;
+  status)  shift; cmd_status "$@" ;;
+  ssh)     shift; cmd_ssh "$@" ;;
+  config)  shift; cmd_config "$@" ;;
+  *)       usage ;;
+esac
