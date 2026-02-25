@@ -240,39 +240,54 @@ All labels are created automatically when the app is installed. Trigger labels (
 
 ## Deployment
 
-### VPS setup
+The `bin/doobee` CLI manages your VPS. Configure it once, then use short commands.
 
-Copy the repo to your server and run the install script:
+### CLI setup
+
+Add to your `~/.zshrc` (or symlink `bin/doobee` to somewhere on PATH):
 
 ```bash
-# From your local machine (only tracked files, respects .gitignore)
-git archive --format=tar HEAD | ssh root@your-vps 'mkdir -p /tmp/doobee && tar -xf - -C /tmp/doobee'
-
-# On the VPS (as root)
-bash /tmp/doobee/deploy/install.sh
+export PATH="/path/to/doobee/bin:$PATH"
 ```
 
-The script creates a `doobee` user, installs Bun, Claude Code CLI, copies the source to `/home/doobee/doobee`, installs dependencies, and sets up a systemd service.
+Configure your VPS target:
+
+```bash
+doobee config vps_host root@your-server
+```
+
+### First-time VPS setup
+
+```bash
+doobee install
+```
+
+This uploads the repo and runs `deploy/install.sh`, which creates a `doobee` user, installs Bun, Claude Code CLI, copies the source, installs dependencies, and sets up a systemd service.
 
 After install, follow the printed instructions to:
 
 1. Copy your GitHub App private key (`.pem`)
-2. Fill in `.env` (`APP_ID`, `WEBHOOK_SECRET`)
+2. Fill in `.env` (`APP_ID`, `WEBHOOK_SECRET`, `ALLOWED_ACCOUNTS`)
 3. Authenticate Claude CLI (`claude login`)
 4. Set up a reverse proxy (Caddy recommended for auto-HTTPS)
 5. Start the service (`systemctl start doobee`)
 
-To deploy updates:
+> **Note:** Claude CLI refuses `--dangerously-skip-permissions` as root — the install script creates a dedicated `doobee` user for this reason.
+
+### Deploy updates
 
 ```bash
-# From your local machine
-git archive --format=tar HEAD | ssh root@your-vps 'mkdir -p /tmp/doobee && tar -xf - -C /tmp/doobee'
-
-# On VPS
-bash /tmp/doobee/deploy/deploy.sh
+doobee deploy
 ```
 
-> **Note:** Claude CLI refuses `--dangerously-skip-permissions` as root — the install script creates a dedicated `doobee` user for this reason.
+### Other commands
+
+```bash
+doobee logs           # follow service logs
+doobee logs -n 100    # last 100 lines
+doobee status         # systemctl status
+doobee ssh            # open shell on VPS
+```
 
 ### Local development
 
