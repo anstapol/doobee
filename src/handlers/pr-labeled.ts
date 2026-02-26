@@ -3,7 +3,7 @@ import type { EmitterWebhookEvent } from "@octokit/webhooks"
 import { loadConfig } from "../config"
 import { cloneIfMissing } from "../git"
 import type { GitHub } from "../github"
-import { LABELS } from "../github"
+import { LABELS, postComment } from "../github"
 import type { JobQueue } from "../queue"
 import { reviewPr } from "../review-pr"
 import { revise } from "../revise"
@@ -41,9 +41,19 @@ export async function handlePrLabeled(
 
   const baseBranch = payload.pull_request.base.ref
 
-  const token = await github.token(installationId)
-  await cloneIfMissing(repoUrl, repoDir, token)
-  const config = await loadConfig(repoDir)
+  let config: Awaited<ReturnType<typeof loadConfig>>
+  try {
+    const token = await github.token(installationId)
+    await cloneIfMissing(repoUrl, repoDir, token)
+    config = await loadConfig(repoDir)
+  } catch (err) {
+    console.error(`[pr-labeled] Failed to prepare PR #${pr.number}: ${err}`)
+    try {
+      const octokit = await github.api(installationId)
+      await postComment(octokit, pr, `Failed to process PR: ${err}`)
+    } catch {}
+    return
+  }
 
   if (labelName === LABELS.review) {
     console.log(`[pr-labeled] Review triggered on PR #${pr.number} in ${owner}/${repo}`)

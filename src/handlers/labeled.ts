@@ -3,7 +3,7 @@ import type { EmitterWebhookEvent } from "@octokit/webhooks"
 import { loadConfig } from "../config"
 import { cloneIfMissing } from "../git"
 import type { GitHub } from "../github"
-import { LABELS } from "../github"
+import { LABELS, postComment } from "../github"
 import type { JobQueue } from "../queue"
 import { solve } from "../solve"
 import type { Issue } from "../types"
@@ -38,9 +38,19 @@ export async function handleLabeled(
 
   console.log(`[labeled] Issue #${issue.number} labeled doobee:solve in ${owner}/${repo}`)
 
-  const token = await github.token(installationId)
-  await cloneIfMissing(repoUrl, repoDir, token)
-  const config = await loadConfig(repoDir)
+  let config: Awaited<ReturnType<typeof loadConfig>>
+  try {
+    const token = await github.token(installationId)
+    await cloneIfMissing(repoUrl, repoDir, token)
+    config = await loadConfig(repoDir)
+  } catch (err) {
+    console.error(`[labeled] Failed to prepare issue #${issue.number}: ${err}`)
+    try {
+      const octokit = await github.api(installationId)
+      await postComment(octokit, issue, `Failed to process issue: ${err}`)
+    } catch {}
+    return
+  }
 
   queue.enqueue({
     id: `solve-${owner}/${repo}#${issue.number}`,

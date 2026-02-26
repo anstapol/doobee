@@ -137,7 +137,10 @@ export async function revise(ctx: ReviseContext): Promise<void> {
     await removeLabel(octokit, pr, LABELS.inProgress)
     // 8. Run stop commands (only if start succeeded)
     if (started) {
-      await runCommands(config.commands.stop, wtPath, mergedEnv)
+      const stopResult = await runCommands(config.commands.stop, wtPath, mergedEnv)
+      if (!stopResult.ok) {
+        console.warn(`[revise] Stop commands failed: ${stopResult.error}`)
+      }
     }
     // 9. Clean up worktree
     await removeWorktree(repoDir, pr.branch)
