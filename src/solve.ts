@@ -196,7 +196,10 @@ export async function solve(ctx: SolveContext): Promise<void> {
     await removeLabel(octokit, issue, LABELS.inProgress)
     // 8. Run stop commands (only if start succeeded)
     if (started) {
-      await runCommands(config.commands.stop, wtPath, mergedEnv)
+      const stopResult = await runCommands(config.commands.stop, wtPath, mergedEnv)
+      if (!stopResult.ok) {
+        console.warn(`[solve] Stop commands failed: ${stopResult.error}`)
+      }
     }
     // 9. Clean up worktree
     await removeWorktree(repoDir, group.branch)

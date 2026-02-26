@@ -3,6 +3,7 @@ import type { EmitterWebhookEvent } from "@octokit/webhooks"
 import { loadConfig } from "../config"
 import { cloneIfMissing } from "../git"
 import type { GitHub } from "../github"
+import { postComment } from "../github"
 import type { JobQueue } from "../queue"
 import { revise } from "../revise"
 import type { PullRequest } from "../types"
@@ -42,9 +43,19 @@ export async function handleReview(
 
   console.log(`[review] Changes requested on PR #${pr.number} in ${owner}/${repo}`)
 
-  const token = await github.token(installationId)
-  await cloneIfMissing(repoUrl, repoDir, token)
-  const config = await loadConfig(repoDir)
+  let config: Awaited<ReturnType<typeof loadConfig>>
+  try {
+    const token = await github.token(installationId)
+    await cloneIfMissing(repoUrl, repoDir, token)
+    config = await loadConfig(repoDir)
+  } catch (err) {
+    console.error(`[review] Failed to prepare PR #${pr.number}: ${err}`)
+    try {
+      const octokit = await github.api(installationId)
+      await postComment(octokit, pr, `Failed to process review: ${err}`)
+    } catch {}
+    return
+  }
 
   queue.enqueue({
     id: `revise-${owner}/${repo}#${pr.number}`,

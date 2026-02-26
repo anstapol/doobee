@@ -74,7 +74,10 @@ export async function createWorktree(
 
 export async function removeWorktree(repoDir: string, branch: string): Promise<void> {
   const wtPath = worktreePath(repoDir, branch)
-  await run(["git", "worktree", "remove", wtPath, "--force"], repoDir)
+  const result = await run(["git", "worktree", "remove", wtPath, "--force"], repoDir)
+  if (!result.ok) {
+    console.warn(`[git] Failed to remove worktree ${wtPath}: ${result.error}`)
+  }
   await run(["git", "worktree", "prune"], repoDir)
 }
 

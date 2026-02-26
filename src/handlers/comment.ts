@@ -3,7 +3,7 @@ import type { EmitterWebhookEvent } from "@octokit/webhooks"
 import { loadConfig } from "../config"
 import { cloneIfMissing } from "../git"
 import type { GitHub } from "../github"
-import { fetchPr } from "../github"
+import { fetchPr, postComment } from "../github"
 import { parseCommand } from "../parse-command"
 import type { JobQueue } from "../queue"
 import { reviewPr } from "../review-pr"
@@ -52,9 +52,20 @@ export async function handleComment(
     return
   }
 
-  const token = await github.token(installationId)
-  await cloneIfMissing(repoUrl, repoDir, token)
-  const config = await loadConfig(repoDir)
+  let config: Awaited<ReturnType<typeof loadConfig>>
+  try {
+    const token = await github.token(installationId)
+    await cloneIfMissing(repoUrl, repoDir, token)
+    config = await loadConfig(repoDir)
+  } catch (err) {
+    console.error(`[comment] Failed to prepare #${payload.issue.number}: ${err}`)
+    try {
+      const octokit = await github.api(installationId)
+      const target = { repoOwner: owner, repoName: repo, number: payload.issue.number }
+      await postComment(octokit, target, `Failed to process command: ${err}`)
+    } catch {}
+    return
+  }
 
   if (parsed.command === "solve") {
     const issue: Issue = {

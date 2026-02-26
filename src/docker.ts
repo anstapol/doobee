@@ -50,19 +50,19 @@ function parsePortMappings(config: ComposeConfig): PortMapping[] {
 
 async function findFreePorts(count: number): Promise<number[]> {
   const listeners: Array<{ port: number; stop: () => void }> = []
-
-  for (let i = 0; i < count; i++) {
-    const listener = Bun.listen({
-      hostname: "127.0.0.1",
-      port: 0,
-      socket: { data() {} },
-    })
-    listeners.push(listener)
+  try {
+    for (let i = 0; i < count; i++) {
+      const listener = Bun.listen({
+        hostname: "127.0.0.1",
+        port: 0,
+        socket: { data() {} },
+      })
+      listeners.push(listener)
+    }
+    return listeners.map((l) => l.port)
+  } finally {
+    for (const l of listeners) l.stop()
   }
-
-  const ports = listeners.map((l) => l.port)
-  for (const l of listeners) l.stop()
-  return ports
 }
 
 function scanEnvVars(raw: string, portMap: Map<number, number>): Record<string, string> {
