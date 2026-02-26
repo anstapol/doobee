@@ -10,6 +10,7 @@ WorkingDirectory=/home/doobee/doobee
 ExecStart=/home/doobee/.bun/bin/bun run dev
 Restart=on-failure
 RestartSec=5
+SyslogIdentifier=doobee
 
 # Bun auto-loads .env from WorkingDirectory
 # claude CLI lives in ~/.bun/bin — must be on PATH for Bun.spawn
