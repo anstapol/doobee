@@ -16,6 +16,7 @@ import {
   fetchAllReviews,
   fetchRepoVariables,
   fetchReviews,
+  LABELS,
   markStuck,
   removeLabel,
 } from "./github"
@@ -37,18 +38,8 @@ export async function revise(ctx: ReviseContext): Promise<void> {
   const octokit = await github.api(installationId)
 
   // Add in-progress label and remove trigger label
-  await addLabel(octokit, {
-    owner: pr.repoOwner,
-    repo: pr.repoName,
-    issueNumber: pr.number,
-    label: "doobee:in-progress",
-  })
-  await removeLabel(octokit, {
-    owner: pr.repoOwner,
-    repo: pr.repoName,
-    issueNumber: pr.number,
-    label: "doobee:revise",
-  })
+  await addLabel(octokit, pr, LABELS.inProgress)
+  await removeLabel(octokit, pr, LABELS.revise)
 
   // 1. Configure auth and fetch origin
   const token = await github.token(installationId)
@@ -57,12 +48,7 @@ export async function revise(ctx: ReviseContext): Promise<void> {
   if (!fetchResult.ok) {
     console.error(`[revise] Fetch failed: ${fetchResult.error}`)
     await markStuck(octokit, pr, `Failed to fetch origin: ${fetchResult.error}`)
-    await removeLabel(octokit, {
-      owner: pr.repoOwner,
-      repo: pr.repoName,
-      issueNumber: pr.number,
-      label: "doobee:in-progress",
-    })
+    await removeLabel(octokit, pr, LABELS.inProgress)
     return
   }
 
@@ -71,12 +57,7 @@ export async function revise(ctx: ReviseContext): Promise<void> {
   if (!wtResult.ok) {
     console.error(`[revise] Failed to create worktree: ${wtResult.error}`)
     await markStuck(octokit, pr, `Failed to create worktree: ${wtResult.error}`)
-    await removeLabel(octokit, {
-      owner: pr.repoOwner,
-      repo: pr.repoName,
-      issueNumber: pr.number,
-      label: "doobee:in-progress",
-    })
+    await removeLabel(octokit, pr, LABELS.inProgress)
     return
   }
   const wtPath = wtResult.value
@@ -92,17 +73,8 @@ export async function revise(ctx: ReviseContext): Promise<void> {
   try {
     // 3. Fetch review comments
     const reviews = reviewId
-      ? await fetchReviews(octokit, {
-          owner: pr.repoOwner,
-          repo: pr.repoName,
-          prNumber: pr.number,
-          reviewId,
-        })
-      : await fetchAllReviews(octokit, {
-          owner: pr.repoOwner,
-          repo: pr.repoName,
-          prNumber: pr.number,
-        })
+      ? await fetchReviews(octokit, pr, reviewId)
+      : await fetchAllReviews(octokit, pr)
 
     // 4. Run setup and start commands
     const setupResult = await runCommands(config.commands.setup, wtPath, mergedEnv)
@@ -162,12 +134,7 @@ export async function revise(ctx: ReviseContext): Promise<void> {
     }
   } finally {
     // 7. Remove in-progress label
-    await removeLabel(octokit, {
-      owner: pr.repoOwner,
-      repo: pr.repoName,
-      issueNumber: pr.number,
-      label: "doobee:in-progress",
-    })
+    await removeLabel(octokit, pr, LABELS.inProgress)
     // 8. Run stop commands (only if start succeeded)
     if (started) {
       await runCommands(config.commands.stop, wtPath, mergedEnv)

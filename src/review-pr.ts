@@ -7,7 +7,7 @@ import {
 } from "./claude"
 import { configureAuth, createWorktree, fetch, getDiff, removeWorktree } from "./git"
 import type { GitHub } from "./github"
-import { postComment, removeLabel, submitReview } from "./github"
+import { LABELS, postComment, removeLabel, submitReview } from "./github"
 import type { DoobeeConfig, PullRequest } from "./types"
 
 export interface ReviewPrContext {
@@ -26,12 +26,7 @@ export async function reviewPr(ctx: ReviewPrContext): Promise<void> {
   const octokit = await github.api(installationId)
 
   // Remove trigger label
-  await removeLabel(octokit, {
-    owner: pr.repoOwner,
-    repo: pr.repoName,
-    issueNumber: pr.number,
-    label: "doobee:review",
-  })
+  await removeLabel(octokit, pr, LABELS.review)
 
   // 1. Configure auth and fetch origin
   const token = await github.token(installationId)
@@ -39,12 +34,7 @@ export async function reviewPr(ctx: ReviewPrContext): Promise<void> {
   const fetchResult = await fetch(repoDir)
   if (!fetchResult.ok) {
     console.error(`[review-pr] Fetch failed: ${fetchResult.error}`)
-    await postComment(octokit, {
-      owner: pr.repoOwner,
-      repo: pr.repoName,
-      issueNumber: pr.number,
-      body: `Could not review PR: failed to fetch origin.`,
-    })
+    await postComment(octokit, pr, `Could not review PR: failed to fetch origin.`)
     return
   }
 
@@ -52,12 +42,7 @@ export async function reviewPr(ctx: ReviewPrContext): Promise<void> {
   const wtResult = await createWorktree(repoDir, pr.branch, pr.branch)
   if (!wtResult.ok) {
     console.error(`[review-pr] Failed to create worktree: ${wtResult.error}`)
-    await postComment(octokit, {
-      owner: pr.repoOwner,
-      repo: pr.repoName,
-      issueNumber: pr.number,
-      body: `Could not review PR: failed to create worktree.`,
-    })
+    await postComment(octokit, pr, `Could not review PR: failed to create worktree.`)
     return
   }
   const wtPath = wtResult.value
@@ -91,12 +76,11 @@ export async function reviewPr(ctx: ReviewPrContext): Promise<void> {
 
     if (result.status === "crashed") {
       console.error(`[review-pr] Claude crashed reviewing PR #${pr.number}`)
-      await postComment(octokit, {
-        owner: pr.repoOwner,
-        repo: pr.repoName,
-        issueNumber: pr.number,
-        body: `Could not complete PR review: Claude crashed.${formatOutput(result.output)}`,
-      })
+      await postComment(
+        octokit,
+        pr,
+        `Could not complete PR review: Claude crashed.${formatOutput(result.output)}`,
+      )
       return
     }
 
@@ -113,13 +97,7 @@ export async function reviewPr(ctx: ReviewPrContext): Promise<void> {
     }
 
     // 6. Submit review
-    await submitReview(octokit, {
-      owner: pr.repoOwner,
-      repo: pr.repoName,
-      prNumber: pr.number,
-      body: "",
-      comments,
-    })
+    await submitReview(octokit, pr, "", comments)
 
     console.log(`[review-pr] Submitted ${comments.length} comments on PR #${pr.number}`)
   } finally {

@@ -1,4 +1,5 @@
 import type { EmitterWebhookEvent } from "@octokit/webhooks"
+import { LABELS } from "../github"
 import type { JobQueue } from "../queue"
 
 export function handleUnlabeled(
@@ -6,7 +7,7 @@ export function handleUnlabeled(
   queue: JobQueue,
 ): void {
   const { payload } = event
-  if (payload.label?.name !== "doobee:in-progress") return
+  if (payload.label?.name !== LABELS.inProgress) return
 
   const owner = payload.repository.owner.login
   const repo = payload.repository.name

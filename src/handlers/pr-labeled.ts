@@ -3,6 +3,7 @@ import type { EmitterWebhookEvent } from "@octokit/webhooks"
 import { loadConfig } from "../config"
 import { cloneIfMissing } from "../git"
 import type { GitHub } from "../github"
+import { LABELS } from "../github"
 import type { JobQueue } from "../queue"
 import { reviewPr } from "../review-pr"
 import { revise } from "../revise"
@@ -16,7 +17,7 @@ export async function handlePrLabeled(
 ): Promise<void> {
   const { payload } = event
   const labelName = payload.label?.name
-  if (labelName !== "doobee:review" && labelName !== "doobee:revise") return
+  if (labelName !== LABELS.review && labelName !== LABELS.revise) return
 
   const installationId = payload.installation?.id
   if (!installationId) {
@@ -44,7 +45,7 @@ export async function handlePrLabeled(
   await cloneIfMissing(repoUrl, repoDir, token)
   const config = await loadConfig(repoDir)
 
-  if (labelName === "doobee:review") {
+  if (labelName === LABELS.review) {
     console.log(`[pr-labeled] Review triggered on PR #${pr.number} in ${owner}/${repo}`)
 
     queue.enqueue({

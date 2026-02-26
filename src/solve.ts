@@ -17,6 +17,7 @@ import {
   fetchParent,
   fetchRepoVariables,
   fetchSubIssues,
+  LABELS,
   markStuck,
   postComment,
   removeLabel,
@@ -38,18 +39,8 @@ export async function solve(ctx: SolveContext): Promise<void> {
   const octokit = await github.api(installationId)
 
   // Add in-progress label and remove solve trigger
-  await addLabel(octokit, {
-    owner: issue.repoOwner,
-    repo: issue.repoName,
-    issueNumber: issue.number,
-    label: "doobee:in-progress",
-  })
-  await removeLabel(octokit, {
-    owner: issue.repoOwner,
-    repo: issue.repoName,
-    issueNumber: issue.number,
-    label: "doobee:solve",
-  })
+  await addLabel(octokit, issue, LABELS.inProgress)
+  await removeLabel(octokit, issue, LABELS.solve)
 
   // 1. Configure auth and fetch origin
   const token = await github.token(installationId)
@@ -58,29 +49,16 @@ export async function solve(ctx: SolveContext): Promise<void> {
   if (!fetchResult.ok) {
     console.error(`[solve] Fetch failed: ${fetchResult.error}`)
     await markStuck(octokit, issue, `Failed to fetch origin: ${fetchResult.error}`)
-    await removeLabel(octokit, {
-      owner: issue.repoOwner,
-      repo: issue.repoName,
-      issueNumber: issue.number,
-      label: "doobee:in-progress",
-    })
+    await removeLabel(octokit, issue, LABELS.inProgress)
     return
   }
 
   // 2. Build issue group
-  const parent = await fetchParent(octokit, {
-    owner: issue.repoOwner,
-    repo: issue.repoName,
-    issueNumber: issue.number,
-  })
+  const parent = await fetchParent(octokit, issue)
 
   let group: SubIssueGroup
   if (parent) {
-    const subIssues = await fetchSubIssues(octokit, {
-      owner: parent.repoOwner,
-      repo: parent.repoName,
-      issueNumber: parent.number,
-    })
+    const subIssues = await fetchSubIssues(octokit, parent)
     group = {
       parent,
       issues: subIssues.length > 0 ? subIssues : [issue],
@@ -99,12 +77,7 @@ export async function solve(ctx: SolveContext): Promise<void> {
   if (!wtResult.ok) {
     console.error(`[solve] Failed to create worktree: ${wtResult.error}`)
     await markStuck(octokit, issue, `Failed to create worktree: ${wtResult.error}`)
-    await removeLabel(octokit, {
-      owner: issue.repoOwner,
-      repo: issue.repoName,
-      issueNumber: issue.number,
-      label: "doobee:in-progress",
-    })
+    await removeLabel(octokit, issue, LABELS.inProgress)
     return
   }
   const wtPath = wtResult.value
@@ -210,28 +183,17 @@ export async function solve(ctx: SolveContext): Promise<void> {
         }
       } else {
         console.error(`[solve] Push failed: ${pushResult.error}`)
-        await postComment(octokit, {
-          owner: issue.repoOwner,
-          repo: issue.repoName,
-          issueNumber: issue.number,
-          body: `Push failed after Claude committed changes.\n\n\`\`\`\n${pushResult.error}\n\`\`\``,
-        })
-        await addLabel(octokit, {
-          owner: issue.repoOwner,
-          repo: issue.repoName,
-          issueNumber: issue.number,
-          label: "doobee:stuck",
-        })
+        await postComment(
+          octokit,
+          issue,
+          `Push failed after Claude committed changes.\n\n\`\`\`\n${pushResult.error}\n\`\`\``,
+        )
+        await addLabel(octokit, issue, LABELS.stuck)
       }
     }
   } finally {
     // 7. Remove in-progress label
-    await removeLabel(octokit, {
-      owner: issue.repoOwner,
-      repo: issue.repoName,
-      issueNumber: issue.number,
-      label: "doobee:in-progress",
-    })
+    await removeLabel(octokit, issue, LABELS.inProgress)
     // 8. Run stop commands (only if start succeeded)
     if (started) {
       await runCommands(config.commands.stop, wtPath, mergedEnv)

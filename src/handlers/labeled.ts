@@ -3,6 +3,7 @@ import type { EmitterWebhookEvent } from "@octokit/webhooks"
 import { loadConfig } from "../config"
 import { cloneIfMissing } from "../git"
 import type { GitHub } from "../github"
+import { LABELS } from "../github"
 import type { JobQueue } from "../queue"
 import { solve } from "../solve"
 import type { Issue } from "../types"
@@ -14,7 +15,7 @@ export async function handleLabeled(
   reposDir: string,
 ): Promise<void> {
   const { payload } = event
-  if (payload.label?.name !== "doobee:solve") return
+  if (payload.label?.name !== LABELS.solve) return
 
   const installationId = payload.installation?.id
   if (!installationId) {

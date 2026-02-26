@@ -2,6 +2,16 @@ import { App } from "@octokit/app"
 import type { Octokit } from "@octokit/core"
 import type { InlineComment, Issue, PullRequest, Result, ReviewComment } from "./types"
 
+export const LABELS = {
+  solve: "doobee:solve",
+  stuck: "doobee:stuck",
+  inProgress: "doobee:in-progress",
+  review: "doobee:review",
+  revise: "doobee:revise",
+} as const
+
+type Target = { repoOwner: string; repoName: string; number: number }
+
 export interface GitHub {
   app: App
   api(installationId: number): Promise<Octokit>
@@ -57,49 +67,41 @@ export async function createPr(
   }
 }
 
-export async function addLabel(
-  octokit: Octokit,
-  opts: { owner: string; repo: string; issueNumber: number; label: string },
-): Promise<void> {
+export async function addLabel(octokit: Octokit, target: Target, label: string): Promise<void> {
   await octokit.request("POST /repos/{owner}/{repo}/issues/{issue_number}/labels", {
-    owner: opts.owner,
-    repo: opts.repo,
-    issue_number: opts.issueNumber,
-    labels: [opts.label],
+    owner: target.repoOwner,
+    repo: target.repoName,
+    issue_number: target.number,
+    labels: [label],
   })
 }
 
-export async function removeLabel(
-  octokit: Octokit,
-  opts: { owner: string; repo: string; issueNumber: number; label: string },
-): Promise<void> {
+export async function removeLabel(octokit: Octokit, target: Target, label: string): Promise<void> {
   try {
     await octokit.request("DELETE /repos/{owner}/{repo}/issues/{issue_number}/labels/{name}", {
-      owner: opts.owner,
-      repo: opts.repo,
-      issue_number: opts.issueNumber,
-      name: opts.label,
+      owner: target.repoOwner,
+      repo: target.repoName,
+      issue_number: target.number,
+      name: label,
     })
   } catch {
     // Label may not exist — ignore
   }
 }
 
-export async function postComment(
-  octokit: Octokit,
-  opts: { owner: string; repo: string; issueNumber: number; body: string },
-): Promise<void> {
+export async function postComment(octokit: Octokit, target: Target, body: string): Promise<void> {
   await octokit.request("POST /repos/{owner}/{repo}/issues/{issue_number}/comments", {
-    owner: opts.owner,
-    repo: opts.repo,
-    issue_number: opts.issueNumber,
-    body: opts.body,
+    owner: target.repoOwner,
+    repo: target.repoName,
+    issue_number: target.number,
+    body,
   })
 }
 
 async function fetchInlineComments(
   octokit: Octokit,
-  opts: { owner: string; repo: string; prNumber: number; reviewId: number },
+  target: Target,
+  reviewId: number,
 ): Promise<ReviewComment[]> {
   const comments: ReviewComment[] = []
   let page = 1
@@ -107,10 +109,10 @@ async function fetchInlineComments(
     const { data: inline } = await octokit.request(
       "GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/comments",
       {
-        owner: opts.owner,
-        repo: opts.repo,
-        pull_number: opts.prNumber,
-        review_id: opts.reviewId,
+        owner: target.repoOwner,
+        repo: target.repoName,
+        pull_number: target.number,
+        review_id: reviewId,
         per_page: 100,
         page,
       },
@@ -134,17 +136,18 @@ async function fetchInlineComments(
 
 export async function fetchReviews(
   octokit: Octokit,
-  opts: { owner: string; repo: string; prNumber: number; reviewId: number },
+  target: Target,
+  reviewId: number,
 ): Promise<ReviewComment[]> {
   const comments: ReviewComment[] = []
 
   const { data: review } = await octokit.request(
     "GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}",
     {
-      owner: opts.owner,
-      repo: opts.repo,
-      pull_number: opts.prNumber,
-      review_id: opts.reviewId,
+      owner: target.repoOwner,
+      repo: target.repoName,
+      pull_number: target.number,
+      review_id: reviewId,
     },
   )
 
@@ -155,22 +158,19 @@ export async function fetchReviews(
     })
   }
 
-  comments.push(...(await fetchInlineComments(octokit, opts)))
+  comments.push(...(await fetchInlineComments(octokit, target, reviewId)))
   return comments
 }
 
-export async function fetchAllReviews(
-  octokit: Octokit,
-  opts: { owner: string; repo: string; prNumber: number },
-): Promise<ReviewComment[]> {
+export async function fetchAllReviews(octokit: Octokit, target: Target): Promise<ReviewComment[]> {
   const comments: ReviewComment[] = []
 
   const { data: reviews } = await octokit.request(
     "GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews",
     {
-      owner: opts.owner,
-      repo: opts.repo,
-      pull_number: opts.prNumber,
+      owner: target.repoOwner,
+      repo: target.repoName,
+      pull_number: target.number,
     },
   )
 
@@ -184,14 +184,7 @@ export async function fetchAllReviews(
       })
     }
 
-    comments.push(
-      ...(await fetchInlineComments(octokit, {
-        owner: opts.owner,
-        repo: opts.repo,
-        prNumber: opts.prNumber,
-        reviewId: review.id,
-      })),
-    )
+    comments.push(...(await fetchInlineComments(octokit, target, review.id)))
   }
 
   return comments
@@ -199,54 +192,33 @@ export async function fetchAllReviews(
 
 export async function submitReview(
   octokit: Octokit,
-  opts: {
-    owner: string
-    repo: string
-    prNumber: number
-    body: string
-    comments: InlineComment[]
-  },
+  target: Target,
+  body: string,
+  comments: InlineComment[],
 ): Promise<void> {
   await octokit.request("POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews", {
-    owner: opts.owner,
-    repo: opts.repo,
-    pull_number: opts.prNumber,
-    body: opts.body,
+    owner: target.repoOwner,
+    repo: target.repoName,
+    pull_number: target.number,
+    body,
     event: "COMMENT",
-    comments: opts.comments,
+    comments,
   })
 }
 
-export async function markStuck(
-  octokit: Octokit,
-  target: { repoOwner: string; repoName: string; number: number },
-  reason: string,
-): Promise<void> {
-  await addLabel(octokit, {
-    owner: target.repoOwner,
-    repo: target.repoName,
-    issueNumber: target.number,
-    label: "doobee:stuck",
-  })
-  await postComment(octokit, {
-    owner: target.repoOwner,
-    repo: target.repoName,
-    issueNumber: target.number,
-    body: reason,
-  })
+export async function markStuck(octokit: Octokit, target: Target, reason: string): Promise<void> {
+  await addLabel(octokit, target, LABELS.stuck)
+  await postComment(octokit, target, reason)
 }
 
-export async function fetchSubIssues(
-  octokit: Octokit,
-  opts: { owner: string; repo: string; issueNumber: number },
-): Promise<Issue[]> {
+export async function fetchSubIssues(octokit: Octokit, target: Target): Promise<Issue[]> {
   try {
     const { data } = await octokit.request(
       "GET /repos/{owner}/{repo}/issues/{issue_number}/sub_issues",
       {
-        owner: opts.owner,
-        repo: opts.repo,
-        issue_number: opts.issueNumber,
+        owner: target.repoOwner,
+        repo: target.repoName,
+        issue_number: target.number,
       },
     )
     const issues = data as Array<{ number: number; title: string; body: string | null }>
@@ -254,26 +226,22 @@ export async function fetchSubIssues(
       number: i.number,
       title: i.title,
       body: i.body,
-      repoOwner: opts.owner,
-      repoName: opts.repo,
+      repoOwner: target.repoOwner,
+      repoName: target.repoName,
     }))
   } catch {
     return []
   }
 }
 
-export async function fetchParent(
-  octokit: Octokit,
-  opts: { owner: string; repo: string; issueNumber: number },
-): Promise<Issue | null> {
+export async function fetchParent(octokit: Octokit, target: Target): Promise<Issue | null> {
   try {
     const { data } = await octokit.request("GET /repos/{owner}/{repo}/issues/{issue_number}", {
-      owner: opts.owner,
-      repo: opts.repo,
-      issue_number: opts.issueNumber,
+      owner: target.repoOwner,
+      repo: target.repoName,
+      issue_number: target.number,
     })
     const body = data.body ?? ""
-    // Check for parent issue reference in body (GitHub sub-issues pattern)
     const parentMatch = body.match(/(?:parent|tracking)\s+(?:issue\s+)?#(\d+)/i)
     if (!parentMatch) return null
 
@@ -281,8 +249,8 @@ export async function fetchParent(
     const { data: parent } = await octokit.request(
       "GET /repos/{owner}/{repo}/issues/{issue_number}",
       {
-        owner: opts.owner,
-        repo: opts.repo,
+        owner: target.repoOwner,
+        repo: target.repoName,
         issue_number: parentNumber,
       },
     )
@@ -290,8 +258,8 @@ export async function fetchParent(
       number: parent.number,
       title: parent.title,
       body: parent.body ?? null,
-      repoOwner: opts.owner,
-      repoName: opts.repo,
+      repoOwner: target.repoOwner,
+      repoName: target.repoName,
     }
   } catch {
     return null

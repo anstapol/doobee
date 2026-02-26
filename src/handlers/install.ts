@@ -1,6 +1,6 @@
 import type { EmitterWebhookEvent } from "@octokit/webhooks"
 import type { GitHub } from "../github"
-import { ensureLabel } from "../github"
+import { ensureLabel, LABELS } from "../github"
 
 type InstallEvent =
   | EmitterWebhookEvent<"installation.created">
@@ -25,7 +25,7 @@ export async function handleInstall(event: InstallEvent, github: GitHub): Promis
     await ensureLabel(octokit, {
       owner,
       repo: name,
-      name: "doobee:stuck",
+      name: LABELS.stuck,
       color: "D93F0B",
       description: "Doobee could not resolve this issue",
     })
@@ -33,7 +33,7 @@ export async function handleInstall(event: InstallEvent, github: GitHub): Promis
     await ensureLabel(octokit, {
       owner,
       repo: name,
-      name: "doobee:solve",
+      name: LABELS.solve,
       color: "0E8A16",
       description: "Trigger Doobee to solve this issue",
     })
@@ -41,7 +41,7 @@ export async function handleInstall(event: InstallEvent, github: GitHub): Promis
     await ensureLabel(octokit, {
       owner,
       repo: name,
-      name: "doobee:in-progress",
+      name: LABELS.inProgress,
       color: "0075CA",
       description: "Doobee is currently working on this",
     })
@@ -49,7 +49,7 @@ export async function handleInstall(event: InstallEvent, github: GitHub): Promis
     await ensureLabel(octokit, {
       owner,
       repo: name,
-      name: "doobee:review",
+      name: LABELS.review,
       color: "5319E7",
       description: "Trigger Doobee to review this PR",
     })
@@ -57,7 +57,7 @@ export async function handleInstall(event: InstallEvent, github: GitHub): Promis
     await ensureLabel(octokit, {
       owner,
       repo: name,
-      name: "doobee:revise",
+      name: LABELS.revise,
       color: "FBCA04",
       description: "Trigger Doobee to address review feedback on this PR",
     })
