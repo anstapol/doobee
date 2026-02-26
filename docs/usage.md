@@ -56,16 +56,16 @@ To retry: remove `doobee:stuck`, fix the issue description if needed, and re-add
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Idle: Issue/PR exists
+    [*] --> Idle
 
-    Idle --> InProgress: Add trigger label
+    Idle --> InProgress: User adds trigger label
     InProgress --> Solved: Claude succeeds
     InProgress --> Stuck: Claude fails after maxRetries
-    InProgress --> Cancelled: Remove in-progress label
+    InProgress --> Cancelled: User removes in-progress label
 
-    Solved --> [*]
-    Stuck --> Idle: Remove stuck label, re-add trigger
-    Cancelled --> Idle: Re-add trigger label
+    Solved --> [*]: PR created/updated
+    Stuck --> [*]: Stuck label added, comment posted
+    Cancelled --> [*]: Process killed, worktree cleaned up
 
     state InProgress {
         [*] --> TriggerRemoved: Trigger label removed on job start
@@ -74,7 +74,7 @@ stateDiagram-v2
     }
 ```
 
-Trigger labels (`doobee:solve`, `doobee:review`, `doobee:revise`) are removed when the job starts. This means re-adding the label re-triggers the action. The `doobee:in-progress` label is added while Doobee is working and removed when done.
+Trigger labels (`doobee:solve`, `doobee:review`, `doobee:revise`) are removed when the job starts, so re-adding re-triggers the action. The `doobee:in-progress` label is added while Doobee is working and removed when done. To retry after stuck: user removes `doobee:stuck` and re-adds the trigger label.
 
 ## Job queue
 
