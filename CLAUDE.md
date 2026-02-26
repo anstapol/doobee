@@ -260,4 +260,4 @@ claude -p --dangerously-skip-permissions --append-system-prompt "<system>" [--mo
 
 ### Documentation
 
-When changing behavior, update `CLAUDE.md` and `README.md` to match. Docs stay in sync with code.
+When changing behavior, update `CLAUDE.md`, `README.md`, and relevant `docs/` files to match. Docs stay in sync with code.
