@@ -97,31 +97,11 @@ export async function postComment(
   })
 }
 
-export async function fetchReviews(
+async function fetchInlineComments(
   octokit: Octokit,
   opts: { owner: string; repo: string; prNumber: number; reviewId: number },
 ): Promise<ReviewComment[]> {
   const comments: ReviewComment[] = []
-
-  // Fetch the specific review's body
-  const { data: review } = await octokit.request(
-    "GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}",
-    {
-      owner: opts.owner,
-      repo: opts.repo,
-      pull_number: opts.prNumber,
-      review_id: opts.reviewId,
-    },
-  )
-
-  if (review.body) {
-    comments.push({
-      author: review.user?.login ?? "unknown",
-      body: review.body,
-    })
-  }
-
-  // Fetch inline comments for this specific review (paginated)
   let page = 1
   while (true) {
     const { data: inline } = await octokit.request(
@@ -149,7 +129,33 @@ export async function fetchReviews(
     if (inline.length < 100) break
     page++
   }
+  return comments
+}
 
+export async function fetchReviews(
+  octokit: Octokit,
+  opts: { owner: string; repo: string; prNumber: number; reviewId: number },
+): Promise<ReviewComment[]> {
+  const comments: ReviewComment[] = []
+
+  const { data: review } = await octokit.request(
+    "GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}",
+    {
+      owner: opts.owner,
+      repo: opts.repo,
+      pull_number: opts.prNumber,
+      review_id: opts.reviewId,
+    },
+  )
+
+  if (review.body) {
+    comments.push({
+      author: review.user?.login ?? "unknown",
+      body: review.body,
+    })
+  }
+
+  comments.push(...(await fetchInlineComments(octokit, opts)))
   return comments
 }
 
@@ -159,7 +165,6 @@ export async function fetchAllReviews(
 ): Promise<ReviewComment[]> {
   const comments: ReviewComment[] = []
 
-  // Fetch all reviews on the PR
   const { data: reviews } = await octokit.request(
     "GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews",
     {
@@ -169,7 +174,6 @@ export async function fetchAllReviews(
     },
   )
 
-  // Collect comments from all reviews that requested changes
   const changesRequested = reviews.filter((r: { state: string }) => r.state === "CHANGES_REQUESTED")
 
   for (const review of changesRequested) {
@@ -180,34 +184,14 @@ export async function fetchAllReviews(
       })
     }
 
-    // Fetch inline comments for this review (paginated)
-    let page = 1
-    while (true) {
-      const { data: inline } = await octokit.request(
-        "GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/comments",
-        {
-          owner: opts.owner,
-          repo: opts.repo,
-          pull_number: opts.prNumber,
-          review_id: review.id,
-          per_page: 100,
-          page,
-        },
-      )
-
-      for (const comment of inline) {
-        comments.push({
-          author: comment.user?.login ?? "unknown",
-          body: comment.body,
-          path: comment.path,
-          line: comment.line ?? undefined,
-          diffHunk: comment.diff_hunk,
-        })
-      }
-
-      if (inline.length < 100) break
-      page++
-    }
+    comments.push(
+      ...(await fetchInlineComments(octokit, {
+        owner: opts.owner,
+        repo: opts.repo,
+        prNumber: opts.prNumber,
+        reviewId: review.id,
+      })),
+    )
   }
 
   return comments
@@ -230,6 +214,25 @@ export async function submitReview(
     body: opts.body,
     event: "COMMENT",
     comments: opts.comments,
+  })
+}
+
+export async function markStuck(
+  octokit: Octokit,
+  target: { repoOwner: string; repoName: string; number: number },
+  reason: string,
+): Promise<void> {
+  await addLabel(octokit, {
+    owner: target.repoOwner,
+    repo: target.repoName,
+    issueNumber: target.number,
+    label: "doobee:stuck",
+  })
+  await postComment(octokit, {
+    owner: target.repoOwner,
+    repo: target.repoName,
+    issueNumber: target.number,
+    body: reason,
   })
 }
 

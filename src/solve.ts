@@ -1,4 +1,3 @@
-import type { Octokit } from "@octokit/core"
 import { buildSolvePrompt, buildSystemPrompt, formatOutput, runClaude } from "./claude"
 import { runCommands } from "./commands"
 import { isolateDockerPorts } from "./docker"
@@ -18,6 +17,7 @@ import {
   fetchParent,
   fetchRepoVariables,
   fetchSubIssues,
+  markStuck,
   postComment,
   removeLabel,
 } from "./github"
@@ -31,21 +31,6 @@ export interface SolveContext {
   repoDir: string
   extraContext?: string
   signal?: AbortSignal
-}
-
-async function markStuck(octokit: Octokit, issue: Issue, reason: string): Promise<void> {
-  await addLabel(octokit, {
-    owner: issue.repoOwner,
-    repo: issue.repoName,
-    issueNumber: issue.number,
-    label: "doobee:stuck",
-  })
-  await postComment(octokit, {
-    owner: issue.repoOwner,
-    repo: issue.repoName,
-    issueNumber: issue.number,
-    body: reason,
-  })
 }
 
 export async function solve(ctx: SolveContext): Promise<void> {
