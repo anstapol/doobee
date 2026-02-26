@@ -16,7 +16,7 @@ import {
   fetchAllReviews,
   fetchRepoVariables,
   fetchReviews,
-  postComment,
+  markStuck,
   removeLabel,
 } from "./github"
 import type { DoobeeConfig, PullRequest } from "./types"
@@ -56,18 +56,7 @@ export async function revise(ctx: ReviseContext): Promise<void> {
   const fetchResult = await fetch(repoDir)
   if (!fetchResult.ok) {
     console.error(`[revise] Fetch failed: ${fetchResult.error}`)
-    await addLabel(octokit, {
-      owner: pr.repoOwner,
-      repo: pr.repoName,
-      issueNumber: pr.number,
-      label: "doobee:stuck",
-    })
-    await postComment(octokit, {
-      owner: pr.repoOwner,
-      repo: pr.repoName,
-      issueNumber: pr.number,
-      body: `Failed to fetch origin: ${fetchResult.error}`,
-    })
+    await markStuck(octokit, pr, `Failed to fetch origin: ${fetchResult.error}`)
     await removeLabel(octokit, {
       owner: pr.repoOwner,
       repo: pr.repoName,
@@ -81,18 +70,7 @@ export async function revise(ctx: ReviseContext): Promise<void> {
   const wtResult = await createWorktree(repoDir, pr.branch, pr.branch)
   if (!wtResult.ok) {
     console.error(`[revise] Failed to create worktree: ${wtResult.error}`)
-    await addLabel(octokit, {
-      owner: pr.repoOwner,
-      repo: pr.repoName,
-      issueNumber: pr.number,
-      label: "doobee:stuck",
-    })
-    await postComment(octokit, {
-      owner: pr.repoOwner,
-      repo: pr.repoName,
-      issueNumber: pr.number,
-      body: `Failed to create worktree: ${wtResult.error}`,
-    })
+    await markStuck(octokit, pr, `Failed to create worktree: ${wtResult.error}`)
     await removeLabel(octokit, {
       owner: pr.repoOwner,
       repo: pr.repoName,
@@ -130,35 +108,13 @@ export async function revise(ctx: ReviseContext): Promise<void> {
     const setupResult = await runCommands(config.commands.setup, wtPath, mergedEnv)
     if (!setupResult.ok) {
       console.error(`[revise] Setup failed: ${setupResult.error}`)
-      await addLabel(octokit, {
-        owner: pr.repoOwner,
-        repo: pr.repoName,
-        issueNumber: pr.number,
-        label: "doobee:stuck",
-      })
-      await postComment(octokit, {
-        owner: pr.repoOwner,
-        repo: pr.repoName,
-        issueNumber: pr.number,
-        body: `Setup command failed: ${setupResult.error}`,
-      })
+      await markStuck(octokit, pr, `Setup command failed: ${setupResult.error}`)
       return
     }
     const startResult = await runCommands(config.commands.start, wtPath, mergedEnv)
     if (!startResult.ok) {
       console.error(`[revise] Start failed: ${startResult.error}`)
-      await addLabel(octokit, {
-        owner: pr.repoOwner,
-        repo: pr.repoName,
-        issueNumber: pr.number,
-        label: "doobee:stuck",
-      })
-      await postComment(octokit, {
-        owner: pr.repoOwner,
-        repo: pr.repoName,
-        issueNumber: pr.number,
-        body: `Start command failed: ${startResult.error}`,
-      })
+      await markStuck(octokit, pr, `Start command failed: ${startResult.error}`)
       return
     }
     started = true
@@ -188,35 +144,21 @@ export async function revise(ctx: ReviseContext): Promise<void> {
       const pushResult = await push(wtPath, pr.branch)
       if (!pushResult.ok) {
         console.error(`[revise] Push failed: ${pushResult.error}`)
-        await postComment(octokit, {
-          owner: pr.repoOwner,
-          repo: pr.repoName,
-          issueNumber: pr.number,
-          body: `Push failed after Claude committed changes.\n\n\`\`\`\n${pushResult.error}\n\`\`\``,
-        })
-        await addLabel(octokit, {
-          owner: pr.repoOwner,
-          repo: pr.repoName,
-          issueNumber: pr.number,
-          label: "doobee:stuck",
-        })
+        await markStuck(
+          octokit,
+          pr,
+          `Push failed after Claude committed changes.\n\n\`\`\`\n${pushResult.error}\n\`\`\``,
+        )
       }
     } else if (result.status === "complete") {
       // Review feedback already addressed
     } else {
       // stuck or crashed
-      await addLabel(octokit, {
-        owner: pr.repoOwner,
-        repo: pr.repoName,
-        issueNumber: pr.number,
-        label: "doobee:stuck",
-      })
-      await postComment(octokit, {
-        owner: pr.repoOwner,
-        repo: pr.repoName,
-        issueNumber: pr.number,
-        body: `Could not address review feedback. Status: ${result.status}${formatOutput(result.output)}`,
-      })
+      await markStuck(
+        octokit,
+        pr,
+        `Could not address review feedback. Status: ${result.status}${formatOutput(result.output)}`,
+      )
     }
   } finally {
     // 7. Remove in-progress label
