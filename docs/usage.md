@@ -58,18 +58,18 @@ To retry: remove `doobee:stuck`, fix the issue description if needed, and re-add
 stateDiagram-v2
     [*] --> Idle: Issue/PR exists
 
-    Idle --> InProgress: Add doobee:solve / doobee:review / doobee:revise
-    InProgress --> Solved: Claude succeeds → PR created/updated
+    Idle --> InProgress: Add trigger label
+    InProgress --> Solved: Claude succeeds
     InProgress --> Stuck: Claude fails after maxRetries
-    InProgress --> Cancelled: Remove doobee:in-progress
+    InProgress --> Cancelled: Remove in-progress label
 
     Solved --> [*]
-    Stuck --> Idle: Remove doobee:stuck + re-add trigger label
+    Stuck --> Idle: Remove stuck label, re-add trigger
     Cancelled --> Idle: Re-add trigger label
 
     state InProgress {
         [*] --> TriggerRemoved: Trigger label removed on job start
-        TriggerRemoved --> Working: doobee:in-progress added
+        TriggerRemoved --> Working: In-progress label added
         Working --> [*]: Job finishes
     }
 ```
