@@ -110,22 +110,6 @@ Create `.doobee.json` in your repo root:
 
 All fields are optional. See [full configuration docs](docs/configuration.md) for repo/org variables, Docker port isolation, and more.
 
-## Local usage
-
-Use Doobee as a Claude Code skill to solve issues locally — no server needed.
-
-```bash
-cp -r .claude/skills/gh-solve-issue ~/.claude/skills/gh-solve-issue
-```
-
-Then in Claude Code, in any repo:
-
-```
-/gh-solve-issue 42
-```
-
-Requires `claude`, `gh`, and `git` on PATH.
-
 ## Deployment
 
 The `bin/doobee` CLI manages your VPS:
