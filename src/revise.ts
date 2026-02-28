@@ -1,6 +1,5 @@
 import { buildRevisionPrompt, buildSystemPrompt, formatOutput, runClaude } from "./claude"
 import { runCommands } from "./commands"
-import { isolateDockerPorts } from "./docker"
 import {
   configureAuth,
   createWorktree,
@@ -20,6 +19,7 @@ import {
   markStuck,
   removeLabel,
 } from "./github"
+import { assignPorts } from "./ports"
 import type { DoobeeConfig, PullRequest } from "./types"
 
 export interface ReviseContext {
@@ -63,12 +63,12 @@ export async function revise(ctx: ReviseContext): Promise<void> {
   const wtPath = wtResult.value
 
   let started = false
-  const dockerEnv = await isolateDockerPorts(wtPath)
+  const portEnv = config.ports.length > 0 ? await assignPorts(config.ports) : undefined
   const repoVars = await fetchRepoVariables(octokit, {
     owner: pr.repoOwner,
     repo: pr.repoName,
   })
-  const env = { ...repoVars, ...dockerEnv }
+  const env = { ...repoVars, ...portEnv }
   const mergedEnv = Object.keys(env).length > 0 ? env : undefined
   try {
     // 3. Fetch review comments
@@ -93,7 +93,7 @@ export async function revise(ctx: ReviseContext): Promise<void> {
 
     // 5. Build prompts and run Claude
     const prompt = buildRevisionPrompt(pr, reviews, config, extraContext)
-    const systemPrompt = buildSystemPrompt(config, dockerEnv)
+    const systemPrompt = buildSystemPrompt(config, portEnv)
     const sha = await getCurrentSha(wtPath)
 
     console.log(`[revise] Running Claude for PR #${pr.number}`)
