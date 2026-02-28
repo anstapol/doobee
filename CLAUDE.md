@@ -34,7 +34,7 @@ SOLID where it matters: single responsibility per module, depend on abstractions
 
 Runtime: `@octokit/app`, `@octokit/webhooks`. That's it. Add nothing without explicit approval.
 
-External CLIs: `git`, `claude`, `docker` (optional, for port isolation). Must be on PATH.
+External CLIs: `git`, `claude`. Must be on PATH.
 
 ### Config
 
