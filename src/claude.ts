@@ -293,11 +293,10 @@ export function buildSystemPrompt(config: DoobeeConfig, portEnv?: Record<string,
 
   if (portEnv) {
     const assignments = Object.entries(portEnv)
-      .filter(([key]) => key !== "COMPOSE_FILE")
       .map(([key, val]) => `${key}=${val}`)
       .join(", ")
     if (assignments) {
-      lines.push(`Docker port assignments: ${assignments}`)
+      lines.push(`Port assignments: ${assignments}`)
       lines.push("Use these ports when accessing services on localhost.")
     }
   }

@@ -1,6 +1,5 @@
 import { buildSolvePrompt, buildSystemPrompt, formatOutput, runClaude } from "./claude"
 import { runCommands } from "./commands"
-import { isolateDockerPorts } from "./docker"
 import {
   configureAuth,
   createWorktree,
@@ -22,6 +21,7 @@ import {
   postComment,
   removeLabel,
 } from "./github"
+import { assignPorts } from "./ports"
 import type { DoobeeConfig, Issue, SubIssueGroup } from "./types"
 
 export interface SolveContext {
@@ -83,12 +83,12 @@ export async function solve(ctx: SolveContext): Promise<void> {
   const wtPath = wtResult.value
 
   let started = false
-  const dockerEnv = await isolateDockerPorts(wtPath)
+  const portEnv = config.ports.length > 0 ? await assignPorts(config.ports) : undefined
   const repoVars = await fetchRepoVariables(octokit, {
     owner: issue.repoOwner,
     repo: issue.repoName,
   })
-  const env = { ...repoVars, ...dockerEnv }
+  const env = { ...repoVars, ...portEnv }
   const mergedEnv = Object.keys(env).length > 0 ? env : undefined
   try {
     // 4. Run setup and start commands
@@ -113,7 +113,7 @@ export async function solve(ctx: SolveContext): Promise<void> {
     for (const current of group.issues) {
       const sha = await getCurrentSha(wtPath)
       const prompt = buildSolvePrompt(current, config, extraContext)
-      const systemPrompt = buildSystemPrompt(config, dockerEnv)
+      const systemPrompt = buildSystemPrompt(config, portEnv)
 
       console.log(`[solve] Running Claude for issue #${current.number}`)
       const result = await runClaude({

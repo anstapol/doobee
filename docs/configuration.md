@@ -38,6 +38,7 @@ See `schema.json` for the full JSON Schema spec.
 | `maxRetries` | `3` | Attempts before Claude gives up and marks stuck |
 | `timeout` | `3600` | Max seconds for a Claude invocation before it is killed |
 | `model` | — | Claude model override (e.g. `claude-sonnet-4-5-20250929`) |
+| `ports` | `[]` | Env var names that need unique free ports (e.g. `["DB_PORT"]`) |
 | `promptContext` | — | Extra context injected into Claude's prompt (repo conventions, stack info) |
 
 **Note:** `commands.setup`, `start`, and `stop` are run by Doobee directly (via `sh -c`). `commands.verify` and `fix` are instructions passed to Claude — Claude decides when and how to run them.
@@ -92,35 +93,33 @@ composer install
 
 If permissions are not granted, Doobee continues without those variables (logs a warning and degrades gracefully).
 
-## Docker port isolation
+## Port isolation
 
-When running jobs in a worktree, Doobee can remap Docker Compose ports to avoid conflicts with other running services.
-
-```mermaid
-flowchart LR
-    Detect[Detect compose file] --> Parse[docker compose config --format json]
-    Parse --> Allocate[Allocate free host ports]
-    Allocate --> Override[Write docker-compose.override.yml]
-    Override --> Env[Set port env vars]
-    Env --> Commands[Pass to setup/start/stop + Claude]
-```
+When running concurrent jobs, Doobee assigns unique free ports to avoid conflicts between sessions.
 
 ### How it works
 
-1. Before running commands, `isolateDockerPorts()` checks for a compose file (`compose.yml`, `docker-compose.yml`, etc.)
-2. Runs `docker compose config --format json` to parse all port mappings
-3. Allocates a free host port for each published port
-4. Writes `docker-compose.override.yml` with `!reset` tags to replace port mappings
-   - If the repo already has a `docker-compose.override.yml`, writes to `.doobee-compose-ports.yml` and sets `COMPOSE_FILE` to chain both
-5. Scans the raw compose file for `${VAR:-default}` patterns where the default matches a remapped port, then sets those env vars to the new ports
-6. Port env vars are passed to all commands and Claude's process — the system prompt includes port assignments so Claude knows which ports to use
+Projects declare which env vars need unique ports in `.doobee.json`:
 
-Override file is auto-cleaned when the worktree is removed. No compose file or no ports = no-op.
+```json
+{
+  "ports": ["DB_PORT", "ADMIN_PORT", "API_PORT", "WWW_PORT"]
+}
+```
+
+1. Before running commands, Doobee calls `assignPorts()` for each declared env var
+2. Allocates a free host port per var using `Bun.listen({ port: 0 })`
+3. Sets each var in the process environment (e.g. `DB_PORT=32857`)
+4. Port env vars flow to setup/start/stop commands, Claude's process, and the system prompt
+
+Projects use these env vars in `docker-compose.yml` (e.g. `${DB_PORT:-5432}:5432`) and `.env.example` files (e.g. `DATABASE_URL=...localhost:${DB_PORT:-5432}/db`). Normal dev uses the default port; Doobee overrides it via process env.
+
+No `ports` config = no-op.
 
 ### Variable precedence
 
 When env vars are merged for commands and Claude:
 
-1. Docker port env vars (highest precedence)
+1. Port env vars (highest precedence)
 2. Repository variables
 3. Organization variables (lowest precedence)
