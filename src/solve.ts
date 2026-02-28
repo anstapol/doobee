@@ -21,7 +21,6 @@ import {
   postComment,
   removeLabel,
 } from "./github"
-import { assignPorts } from "./ports"
 import type { DoobeeConfig, Issue, SubIssueGroup } from "./types"
 
 export interface SolveContext {
@@ -83,13 +82,10 @@ export async function solve(ctx: SolveContext): Promise<void> {
   const wtPath = wtResult.value
 
   let started = false
-  const portEnv = config.ports.length > 0 ? await assignPorts(config.ports) : undefined
-  const repoVars = await fetchRepoVariables(octokit, {
+  const mergedEnv = await fetchRepoVariables(octokit, {
     owner: issue.repoOwner,
     repo: issue.repoName,
   })
-  const env = { ...repoVars, ...portEnv }
-  const mergedEnv = Object.keys(env).length > 0 ? env : undefined
   try {
     // 4. Run setup and start commands
     const setupResult = await runCommands(config.commands.setup, wtPath, mergedEnv)
@@ -113,7 +109,7 @@ export async function solve(ctx: SolveContext): Promise<void> {
     for (const current of group.issues) {
       const sha = await getCurrentSha(wtPath)
       const prompt = buildSolvePrompt(current, config, extraContext)
-      const systemPrompt = buildSystemPrompt(config, portEnv)
+      const systemPrompt = buildSystemPrompt(config)
 
       console.log(`[solve] Running Claude for issue #${current.number}`)
       const result = await runClaude({

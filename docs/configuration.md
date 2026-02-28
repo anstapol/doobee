@@ -38,7 +38,6 @@ See `schema.json` for the full JSON Schema spec.
 | `maxRetries` | `3` | Attempts before Claude gives up and marks stuck |
 | `timeout` | `3600` | Max seconds for a Claude invocation before it is killed |
 | `model` | — | Claude model override (e.g. `claude-sonnet-4-5-20250929`) |
-| `ports` | `[]` | Env var names that need unique free ports (e.g. `["DB_PORT"]`) |
 | `promptContext` | — | Extra context injected into Claude's prompt (repo conventions, stack info) |
 
 **Note:** `commands.setup`, `start`, and `stop` are run by Doobee directly (via `sh -c`). `commands.verify` and `fix` are instructions passed to Claude — Claude decides when and how to run them.
@@ -92,34 +91,3 @@ composer install
 ```
 
 If permissions are not granted, Doobee continues without those variables (logs a warning and degrades gracefully).
-
-## Port isolation
-
-When running concurrent jobs, Doobee assigns unique free ports to avoid conflicts between sessions.
-
-### How it works
-
-Projects declare which env vars need unique ports in `.doobee.json`:
-
-```json
-{
-  "ports": ["DB_PORT", "ADMIN_PORT", "API_PORT", "WWW_PORT"]
-}
-```
-
-1. Before running commands, Doobee calls `assignPorts()` for each declared env var
-2. Allocates a free host port per var using `Bun.listen({ port: 0 })`
-3. Sets each var in the process environment (e.g. `DB_PORT=32857`)
-4. Port env vars flow to setup/start/stop commands, Claude's process, and the system prompt
-
-Projects use these env vars in `docker-compose.yml` (e.g. `${DB_PORT:-5432}:5432`) and `.env.example` files (e.g. `DATABASE_URL=...localhost:${DB_PORT:-5432}/db`). Normal dev uses the default port; Doobee overrides it via process env.
-
-No `ports` config = no-op.
-
-### Variable precedence
-
-When env vars are merged for commands and Claude:
-
-1. Port env vars (highest precedence)
-2. Repository variables
-3. Organization variables (lowest precedence)

@@ -19,7 +19,6 @@ import {
   markStuck,
   removeLabel,
 } from "./github"
-import { assignPorts } from "./ports"
 import type { DoobeeConfig, PullRequest } from "./types"
 
 export interface ReviseContext {
@@ -63,13 +62,10 @@ export async function revise(ctx: ReviseContext): Promise<void> {
   const wtPath = wtResult.value
 
   let started = false
-  const portEnv = config.ports.length > 0 ? await assignPorts(config.ports) : undefined
-  const repoVars = await fetchRepoVariables(octokit, {
+  const mergedEnv = await fetchRepoVariables(octokit, {
     owner: pr.repoOwner,
     repo: pr.repoName,
   })
-  const env = { ...repoVars, ...portEnv }
-  const mergedEnv = Object.keys(env).length > 0 ? env : undefined
   try {
     // 3. Fetch review comments
     const reviews = reviewId
@@ -93,7 +89,7 @@ export async function revise(ctx: ReviseContext): Promise<void> {
 
     // 5. Build prompts and run Claude
     const prompt = buildRevisionPrompt(pr, reviews, config, extraContext)
-    const systemPrompt = buildSystemPrompt(config, portEnv)
+    const systemPrompt = buildSystemPrompt(config)
     const sha = await getCurrentSha(wtPath)
 
     console.log(`[revise] Running Claude for PR #${pr.number}`)

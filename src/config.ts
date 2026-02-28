@@ -12,7 +12,6 @@ export const DEFAULT_CONFIG: DoobeeConfig = {
   },
   maxRetries: 3,
   timeout: 3600,
-  ports: [],
 }
 
 function asStringArray(value: unknown): string[] | undefined {
@@ -58,7 +57,6 @@ export async function loadConfig(repoDir: string): Promise<DoobeeConfig> {
         : DEFAULT_CONFIG.maxRetries,
     timeout:
       typeof obj.timeout === "number" && obj.timeout > 0 ? obj.timeout : DEFAULT_CONFIG.timeout,
-    ports: asStringArray(obj.ports) ?? DEFAULT_CONFIG.ports,
     promptContext: typeof obj.promptContext === "string" ? obj.promptContext : undefined,
     model: typeof obj.model === "string" ? obj.model : undefined,
   }

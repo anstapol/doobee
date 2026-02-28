@@ -277,7 +277,7 @@ export function parseReviewComments(output: string): InlineComment[] {
   return comments
 }
 
-export function buildSystemPrompt(config: DoobeeConfig, portEnv?: Record<string, string>): string {
+export function buildSystemPrompt(config: DoobeeConfig): string {
   const lines: string[] = [
     "You are running in a fully automated pipeline. No human operator. Never pause for confirmation.",
     "You have full permission to create, modify, and delete files.",
@@ -291,16 +291,9 @@ export function buildSystemPrompt(config: DoobeeConfig, portEnv?: Record<string,
     lines.push(`Start commands already ran: ${config.commands.start.join(", ")}`)
   }
 
-  if (portEnv) {
-    const assignments = Object.entries(portEnv)
-      .map(([key, val]) => `${key}=${val}`)
-      .join(", ")
-    if (assignments) {
-      lines.push(`Port assignments: ${assignments}`)
-      lines.push("Use these ports when accessing services on localhost.")
-    }
-  }
-
+  lines.push(
+    "Before starting services, check which ports they need and ensure they don't conflict. Remap to free high ports if needed. Never modify committed files — use docker-compose.override.yml for Docker port remapping and .env (not .env.example) for app port variables.",
+  )
   lines.push("Focus only on the issue. Make the smallest change possible. Use existing patterns.")
 
   return lines.join("\n")

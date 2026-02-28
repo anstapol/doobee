@@ -22,8 +22,7 @@ flowchart TD
     Single --> Worktree[Create worktree]
     SubIssues --> Worktree
 
-    Worktree --> Docker[Isolate Docker ports]
-    Docker --> Vars[Fetch repo/org variables]
+    Worktree --> Vars[Fetch repo/org variables]
     Vars --> Setup[Run setup + start commands]
     Setup --> Loop[For each issue in group]
 
@@ -64,8 +63,7 @@ flowchart TD
     Config --> Enqueue[Enqueue revise job]
     Enqueue --> Fetch[git fetch origin]
     Fetch --> Worktree[Create worktree from PR branch]
-    Worktree --> Docker[Isolate Docker ports]
-    Docker --> Vars[Fetch repo/org variables]
+    Worktree --> Vars[Fetch repo/org variables]
     Vars --> Reviews[Fetch review comments<br/>review-level + inline with diff context]
     Reviews --> Setup[Run setup + start commands]
     Setup --> Claude[Spawn Claude CLI with revision prompt]

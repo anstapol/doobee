@@ -108,7 +108,7 @@ Create `.doobee.json` in your repo root:
 | `model` | — | Claude model override |
 | `promptContext` | — | Extra context for Claude's prompt |
 
-All fields are optional. See [full configuration docs](docs/configuration.md) for repo/org variables, port isolation, and more.
+All fields are optional. See [full configuration docs](docs/configuration.md) for repo/org variables and more.
 
 ## Deployment
 
@@ -132,6 +132,6 @@ For local development, use `bun run dev` with ngrok or a similar tunnel for the 
 
 - **[Architecture](docs/architecture.md)** — system overview, components, webhook routing, worktree lifecycle, job queue
 - **[Flows](docs/flows.md)** — detailed Mermaid diagrams for solve, revise, review, comment routing, and cancellation
-- **[Configuration](docs/configuration.md)** — `.doobee.json` deep dive, repo/org variables, port isolation, env vars
+- **[Configuration](docs/configuration.md)** — `.doobee.json` deep dive, repo/org variables, env vars
 - **[Usage](docs/usage.md)** — triggering actions, comment commands, cancellation, stuck handling, sub-issues, label lifecycle
 - **[Reference](docs/reference.md)** — labels, branches, commits, webhook events, endpoints, output markers

@@ -27,7 +27,6 @@ flowchart LR
 | Claude CLI | `src/claude.ts` | Spawn Claude, build prompts, parse output markers |
 | Config | `src/config.ts` | Load `.doobee.json`, merge with defaults |
 | Commands | `src/commands.ts` | Run lifecycle commands (setup, start, stop) |
-| Ports | `src/ports.ts` | Assign free ports for declared env vars |
 | Command parser | `src/parse-command.ts` | Parse `@doobeebot` comment commands |
 
 ### Handlers
