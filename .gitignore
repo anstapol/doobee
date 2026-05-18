@@ -9,6 +9,13 @@
 # Dependencies
 node_modules/
 
+# Secrets
+.env
+*.pem
+
+# Runtime data
+repos/
+
 # OS
 .DS_Store
 
